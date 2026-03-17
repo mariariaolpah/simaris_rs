@@ -2,7 +2,8 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-$role = $_SESSION['role'] ?? '';
+// Perbaikan: Ambil dari 'level' atau 'role' agar lebih aman
+$role = $_SESSION['level'] ?? $_SESSION['role'] ?? '';
 ?>
 
 <style>
@@ -11,7 +12,6 @@ $role = $_SESSION['role'] ?? '';
         background: linear-gradient(180deg, #2c7a7b, #1cc88a);
         color: #fff;
         min-height: 100vh;
-        /* Ini yang bikin hijau sampai bawah */
         display: flex;
         flex-direction: column;
     }
@@ -56,6 +56,6 @@ $role = $_SESSION['role'] ?? '';
             <a href="laporan.php" class="list-group-item"><i class="bi bi-file-earmark-text"></i> Laporan</a>
         <?php endif; ?>
 
-        <a href="/simaris_rs/logout.php" class="list-group-item text-danger"><i class="bi bi-box-arrow-right"></i> Logout</a>
+        <a href="../logout.php" class="list-group-item text-danger"><i class="bi bi-box-arrow-right"></i> Logout</a>
     </div>
 </div>
