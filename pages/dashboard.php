@@ -64,6 +64,12 @@ if (isset($_SESSION['level']) && $_SESSION['level'] == 'user') {
 // Ambil data aset dari tabel aset
 $total_aset = mysqli_fetch_array(mysqli_query($koneksi, "SELECT COUNT(*) AS t FROM aset"))['t'];
 
+// --- TAMBAHAN FITUR SKRIPSI: Hitung total harga aset ---
+$query_harga = mysqli_query($koneksi, "SELECT SUM(harga) AS total_nilai FROM aset");
+$data_harga = mysqli_fetch_assoc($query_harga);
+$total_rupiah = $data_harga['total_nilai'] ? $data_harga['total_nilai'] : 0;
+// -------------------------------------------------------
+
 // Hitung aset berdasarkan kolom kondisi di tabel aset
 $aset_baik = mysqli_fetch_array(mysqli_query($koneksi, "
     SELECT COUNT(*) as t FROM aset 
@@ -269,6 +275,13 @@ $no = 1;
                 </div>
 
                 <div class="stat-row">
+                    <div class="stat-card" style="background-color: #1cc88a;">
+                        <h6>Total Nilai Aset (Rp)</h6>
+                        <p style="font-size: 1.6rem; font-weight: 700; margin: 0; color: #fff;">
+                            Rp <?= number_format($total_rupiah, 0, ',', '.'); ?>
+                        </p>
+                    </div>
+
                     <div class="stat-card">
                         <h6>Total Aset & Infrastruktur</h6>
                         <p style="font-size: 2.5rem; font-weight: 700; margin: 0; color: #fff;"><?= $total_aset ?></p>

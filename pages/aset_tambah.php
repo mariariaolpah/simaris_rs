@@ -18,12 +18,16 @@ if (isset($_POST['simpan'])) {
     $nama = mysqli_real_escape_string($koneksi, $_POST['nama_aset']);
     $jenis = mysqli_real_escape_string($koneksi, $_POST['jenis']);
     $tipe  = mysqli_real_escape_string($koneksi, $_POST['tipe_aset']);
-    $lokasi = mysqli_real_escape_string($koneksi, $_POST['lokasi']); // id_lokasi
+    $lokasi = mysqli_real_escape_string($koneksi, $_POST['lokasi']);
     $kondisi = mysqli_real_escape_string($koneksi, $_POST['kondisi']);
     $tanggal = $_POST['tanggal_masuk'];
 
-    mysqli_query($koneksi, "INSERT INTO aset (nama_aset, jenis, tipe_aset, lokasi, kondisi, tanggal_masuk)
-                            VALUES ('$nama', '$jenis', '$tipe', '$lokasi', '$kondisi', '$tanggal')");
+    // Fitur Tambahan Skripsi
+    $asal_usul = mysqli_real_escape_string($koneksi, $_POST['asal_usul']);
+    $harga = mysqli_real_escape_string($koneksi, $_POST['harga']);
+
+    mysqli_query($koneksi, "INSERT INTO aset (nama_aset, jenis, tipe_aset, lokasi, kondisi, asal_usul, harga, tanggal_masuk)
+                            VALUES ('$nama', '$jenis', '$tipe', '$lokasi', '$kondisi', '$asal_usul', '$harga', '$tanggal')");
 
     echo "<script>alert('Aset berhasil ditambahkan');window.location='aset.php';</script>";
 }
@@ -47,13 +51,11 @@ if (isset($_POST['simpan'])) {
             align-items: center;
         }
 
-        /* Ukuran form lebih kecil daripada sebelumnya */
         .container-form {
             width: 420px;
             max-width: 90%;
         }
 
-        /* Input & dropdown sedikit diperkecil */
         .form-control,
         .form-select {
             height: 42px;
@@ -108,7 +110,6 @@ if (isset($_POST['simpan'])) {
                         <input type="text" name="tipe_aset" class="form-control">
                     </div>
 
-                    <!-- LOKASI DROPDOWN DARI MASTER -->
                     <div class="mb-3">
                         <label class="form-label">Lokasi</label>
                         <select name="lokasi" class="form-control" required>
@@ -121,7 +122,6 @@ if (isset($_POST['simpan'])) {
                         </select>
                     </div>
 
-                    <!-- KONDISI -->
                     <div class="mb-3">
                         <label class="form-label">Kondisi</label>
                         <select name="kondisi" class="form-select" required>
@@ -133,11 +133,26 @@ if (isset($_POST['simpan'])) {
                     </div>
 
                     <div class="mb-3">
+                        <label class="form-label">Asal-Usul Barang</label>
+                        <select name="asal_usul" class="form-select" required>
+                            <option value="">-- Pilih Asal-Usul --</option>
+                            <option value="Pembelian">Pembelian / Anggaran RS</option>
+                            <option value="Hibah">Hibah / Bantuan</option>
+                            <option value="Sewa">Sewa</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Harga Perolehan / Nilai Aset (Rp)</label>
+                        <input type="number" name="harga" class="form-control" placeholder="Contoh: 5000000" required>
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label">Tanggal Masuk</label>
                         <input type="date" name="tanggal_masuk" class="form-control" value="<?= date('Y-m-d') ?>" required>
                     </div>
 
-                    <div class="d-flex justify-content-end gap-2">
+                    <div class="d-flex justify-content-end gap-2 mt-4">
                         <button type="submit" name="simpan" class="btn btn-success px-4">
                             <i class="bi bi-save"></i> Simpan
                         </button>

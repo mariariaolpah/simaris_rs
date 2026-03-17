@@ -157,7 +157,6 @@ while ($row = mysqli_fetch_assoc($query)) {
                         <span>Data Aset</span>
                         <div class="d-flex gap-2 align-items-center">
 
-                            <!-- Form Pencarian -->
                             <form method="GET" class="d-flex gap-2 mb-0">
                                 <input type="text" name="search" class="form-control form-control-sm"
                                     placeholder="Cari aset..."
@@ -168,7 +167,6 @@ while ($row = mysqli_fetch_assoc($query)) {
                                 </button>
                             </form>
 
-                            <!-- Tombol Tambah & Cetak -->
                             <a href="aset_tambah.php" class="btn btn-light fw-bold" style="height:38px; font-size:14px;">
                                 <i class="bi bi-plus-circle"></i> Tambah Aset
                             </a>
@@ -185,9 +183,11 @@ while ($row = mysqli_fetch_assoc($query)) {
                                     <th>#</th>
                                     <th>Nama Aset</th>
                                     <th>Jenis</th>
-                                    <th>Tipe Aset</th> <!-- Tambahan -->
+                                    <th>Tipe Aset</th>
                                     <th>Lokasi</th>
                                     <th>Kondisi</th>
+                                    <th>Asal-Usul</th>
+                                    <th>Harga (Rp)</th>
                                     <th>Tanggal Masuk</th>
                                     <th>Aksi</th>
                                 </tr>
@@ -195,7 +195,7 @@ while ($row = mysqli_fetch_assoc($query)) {
                             <tbody>
                                 <?php if (empty($aset_list)): ?>
                                     <tr>
-                                        <td colspan="7">Belum ada data aset.</td>
+                                        <td colspan="10">Belum ada data aset.</td>
                                     </tr>
                                 <?php else: ?>
                                     <?php foreach ($aset_list as $i => $a): ?>
@@ -203,9 +203,11 @@ while ($row = mysqli_fetch_assoc($query)) {
                                             <td><?= $i + 1 ?></td>
                                             <td><?= htmlspecialchars($a['nama_aset']) ?></td>
                                             <td><?= htmlspecialchars($a['jenis']) ?></td>
-                                            <td><?= htmlspecialchars($a['tipe_aset']) ?></td> <!-- Tambahan -->
+                                            <td><?= htmlspecialchars($a['tipe_aset']) ?></td>
                                             <td><?= htmlspecialchars($a['lokasi']) ?></td>
                                             <td><?= htmlspecialchars($a['kondisi']) ?></td>
+                                            <td><?= htmlspecialchars($a['asal_usul']) ?></td>
+                                            <td>Rp <?= number_format($a['harga'], 0, ',', '.') ?></td>
                                             <td><?= htmlspecialchars($a['tanggal_masuk']) ?></td>
                                             <td class="btn-action">
                                                 <a href="aset_edit.php?id=<?= $a['id_aset'] ?>" class="btn btn-warning btn-sm">

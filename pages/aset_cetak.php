@@ -24,73 +24,60 @@ $result = mysqli_query($koneksi, $sql);
 $pdf = new FPDF('L', 'mm', 'A4');
 $pdf->AddPage();
 
-// ---------- Kop surat dengan logo kiri, teks tengah, logo kanan ----------
+// ---------- Kop surat ----------
 $y = 8;
-
 $logoLeft  = realpath(__DIR__ . '/../assets/img/logo_dokpol.png');
 $logoRight = realpath(__DIR__ . '/../assets/img/logo_rs.jpg');
 
-if (!$logoLeft || !file_exists($logoLeft)) {
-    die('Logo kiri tidak ditemukan: ' . $logoLeft);
-}
-if (!$logoRight || !file_exists($logoRight)) {
-    die('Logo kanan tidak ditemukan: ' . $logoRight);
-}
+$pdf->Image($logoLeft, 15, $y, 22);
+$pdf->Image($logoRight, 260, $y, 22);
 
-$margin = 20;
-$logoWidth = 25;
-
-// Logo kiri
-$pdf->Image($logoLeft, $margin, $y, $logoWidth);
-
-// Logo kanan
-$pdf->Image($logoRight, 297 - $logoWidth - $margin, $y, $logoWidth);
-
-// Teks tengah kop
-$pdf->SetFont('Arial', 'B', 16);
-$pdf->SetXY(0, $y + 5);
+$pdf->SetFont('Arial', 'B', 15);
+$pdf->SetXY(0, $y + 2);
 $pdf->Cell(0, 10, 'RUMKIT BHAYANGKARA TK. III BANJARMASIN', 0, 1, 'C');
-
-$pdf->SetFont('Arial', '', 12);
-$pdf->SetX(0);
-$pdf->Cell(0, 6, 'Jl. A. Yani Km. 3,5 Banjarmasin 70235', 0, 1, 'C');
-
+$pdf->SetFont('Arial', '', 11);
+$pdf->Cell(0, 5, 'Jl. A. Yani Km. 3,5 Banjarmasin 70235', 0, 1, 'C');
 $pdf->Ln(15);
 
-// ---------- Judul tabel ----------
-$pdf->SetFont('Arial', 'B', 18);
-$pdf->Cell(0, 12, 'Data Aset RS Bhayangkara', 0, 1, 'C');
+// ---------- Judul Laporan ----------
+$pdf->SetFont('Arial', 'B', 14);
+$pdf->Cell(0, 10, 'LAPORAN DATA ASET & INFRASTRUKTUR', 0, 1, 'C');
 $pdf->Ln(5);
 
-// ---------- Header tabel ----------
-$pdf->SetFont('Arial', 'B', 12);
+// ---------- Header Tabel (Ukuran Kolom di-Presisi agar Pas) ----------
+$pdf->SetFont('Arial', 'B', 10);
 $pdf->SetFillColor(52, 152, 219);
 $pdf->SetTextColor(255);
-$pdf->SetDrawColor(0, 0, 0);
-$pdf->SetLineWidth(.3);
 
-$header = ['No', 'Nama Aset', 'Jenis', 'Lokasi', 'Kondisi', 'Tanggal Masuk'];
-$pdf->SetLeftMargin(11);
-$pdf->SetRightMargin(11);
+// Pengaturan Lebar Kolom agar pas di A4 Landscape (Total 275mm)
+$w = [10, 45, 30, 35, 40, 25, 30, 35, 25];
 
-$widths = [12, 70, 50, 70, 40, 35]; // total 277mm < 297 A4
+$pdf->SetX(11);
+$pdf->Cell($w[0], 10, 'No', 1, 0, 'C', true);
+$pdf->Cell($w[1], 10, 'Nama Aset', 1, 0, 'C', true);
+$pdf->Cell($w[2], 10, 'Jenis', 1, 0, 'C', true);
+$pdf->Cell($w[3], 10, 'Tipe', 1, 0, 'C', true);
+$pdf->Cell($w[4], 10, 'Lokasi', 1, 0, 'C', true);
+$pdf->Cell($w[5], 10, 'Kondisi', 1, 0, 'C', true);
+$pdf->Cell($w[6], 10, 'Asal-Usul', 1, 0, 'C', true);
+$pdf->Cell($w[7], 10, 'Harga (Rp)', 1, 0, 'C', true);
+$pdf->Cell($w[8], 10, 'Tgl Masuk', 1, 1, 'C', true);
 
-foreach ($header as $key => $col) {
-    $pdf->Cell($widths[$key], 12, $col, 1, 0, 'C', true);
-}
-$pdf->Ln();
-
-// ---------- Isi tabel ----------
-$pdf->SetFont('Arial', '', 12);
+// ---------- Isi Tabel ----------
+$pdf->SetFont('Arial', '', 9);
 $pdf->SetTextColor(0);
 $i = 1;
 while ($row = mysqli_fetch_assoc($result)) {
-    $pdf->Cell($widths[0], 10, $i++, 1, 0, 'C');
-    $pdf->Cell($widths[1], 10, $row['nama_aset'], 1);
-    $pdf->Cell($widths[2], 10, $row['jenis'], 1);
-    $pdf->Cell($widths[3], 10, $row['lokasi'], 1);
-    $pdf->Cell($widths[4], 10, $row['kondisi'], 1);
-    $pdf->Cell($widths[5], 10, date('Y-m-d', strtotime($row['tanggal_masuk'])), 1, 1);
+    $pdf->SetX(11);
+    $pdf->Cell($w[0], 8, $i++, 1, 0, 'C');
+    $pdf->Cell($w[1], 8, $row['nama_aset'], 1);
+    $pdf->Cell($w[2], 8, $row['jenis'], 1);
+    $pdf->Cell($w[3], 8, $row['tipe_aset'], 1);
+    $pdf->Cell($w[4], 8, $row['lokasi'], 1);
+    $pdf->Cell($w[5], 8, $row['kondisi'], 1, 0, 'C');
+    $pdf->Cell($w[6], 8, $row['asal_usul'], 1, 0, 'C');
+    $pdf->Cell($w[7], 8, number_format($row['harga'], 0, ',', '.'), 1, 0, 'R');
+    $pdf->Cell($w[8], 8, date('d/m/Y', strtotime($row['tanggal_masuk'])), 1, 1, 'C');
 }
 
 $pdf->Output();

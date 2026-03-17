@@ -1,55 +1,60 @@
-<?php
-session_start();
-if (!isset($_SESSION['id_pengguna'])) {
-    header("Location: ../login.php");
-    exit;
-}
+\<?php
+    session_start();
+    if (!isset($_SESSION['id_pengguna'])) {
+        header("Location: ../login.php");
+        exit;
+    }
 
-include(__DIR__ . '/../config/koneksi.php');
+    include(__DIR__ . '/../config/koneksi.php');
 
-// Ambil ID aset
-$id = intval($_GET['id']);
+    // Ambil ID aset
+    $id = intval($_GET['id']);
 
-// Ambil data aset (TANPA JOIN karena kolom lokasi = nama lokasi)
-$data = mysqli_query($koneksi, "SELECT * FROM aset WHERE id_aset = $id");
-$d = mysqli_fetch_assoc($data);
+    // Ambil data aset
+    $data = mysqli_query($koneksi, "SELECT * FROM aset WHERE id_aset = $id");
+    $d = mysqli_fetch_assoc($data);
 
-if (!$d) {
-    echo "<script>alert('Data aset tidak ditemukan');window.location='aset.php';</script>";
-    exit;
-}
+    if (!$d) {
+        echo "<script>alert('Data aset tidak ditemukan');window.location='aset.php';</script>";
+        exit;
+    }
 
-// Ambil daftar lokasi dari tabel lokasi_aset
-$lokasi_list = [];
-$lokasi_query = mysqli_query($koneksi, "SELECT * FROM lokasi_aset ORDER BY nama_lokasi ASC");
-while ($row = mysqli_fetch_assoc($lokasi_query)) {
-    $lokasi_list[] = $row;
-}
+    // Ambil daftar lokasi
+    $lokasi_list = [];
+    $lokasi_query = mysqli_query($koneksi, "SELECT * FROM lokasi_aset ORDER BY nama_lokasi ASC");
+    while ($row = mysqli_fetch_assoc($lokasi_query)) {
+        $lokasi_list[] = $row;
+    }
 
-// Simpan perubahan
-if (isset($_POST['simpan'])) {
+    // Simpan perubahan
+    if (isset($_POST['simpan'])) {
+        $nama = mysqli_real_escape_string($koneksi, $_POST['nama_aset']);
+        $jenis = mysqli_real_escape_string($koneksi, $_POST['jenis']);
+        $tipe_aset = mysqli_real_escape_string($koneksi, $_POST['tipe_aset']);
+        $lokasi = mysqli_real_escape_string($koneksi, $_POST['lokasi']);
+        $kondisi = mysqli_real_escape_string($koneksi, $_POST['kondisi']);
+        $tanggal = $_POST['tanggal_masuk'];
 
-    $nama = mysqli_real_escape_string($koneksi, $_POST['nama_aset']);
-    $jenis = mysqli_real_escape_string($koneksi, $_POST['jenis']);
-    $tipe_aset = mysqli_real_escape_string($koneksi, $_POST['tipe_aset']);
-    $lokasi = mysqli_real_escape_string($koneksi, $_POST['lokasi']); // pakai NAMA lokasi, bukan ID
-    $kondisi = mysqli_real_escape_string($koneksi, $_POST['kondisi']);
-    $tanggal = $_POST['tanggal_masuk'];
+        // Fitur Tambahan Skripsi
+        $asal_usul = mysqli_real_escape_string($koneksi, $_POST['asal_usul']);
+        $harga = mysqli_real_escape_string($koneksi, $_POST['harga']);
 
-    mysqli_query($koneksi, "
+        mysqli_query($koneksi, "
         UPDATE aset SET 
             nama_aset = '$nama',
             jenis = '$jenis',
             tipe_aset = '$tipe_aset',
             lokasi = '$lokasi',
             kondisi = '$kondisi',
+            asal_usul = '$asal_usul',
+            harga = '$harga',
             tanggal_masuk = '$tanggal'
         WHERE id_aset = $id
     ");
 
-    echo "<script>alert('Aset berhasil diubah');window.location='aset.php';</script>";
-}
-?>
+        echo "<script>alert('Aset berhasil diubah');window.location='aset.php';</script>";
+    }
+    ?>
 
 <!DOCTYPE html>
 <html lang="id">
@@ -73,6 +78,7 @@ if (isset($_POST['simpan'])) {
         .container-form {
             width: 420px;
             max-width: 90%;
+            margin: 30px 0;
         }
 
         .form-control,
@@ -104,35 +110,29 @@ if (isset($_POST['simpan'])) {
 </head>
 
 <body>
-
-    <div class="container-form" style="margin-top: 30px;">
+    <div class="container-form">
         <div class="card">
             <div class="card-header">
                 <i class="bi bi-pencil-square"></i> Edit Aset / Infrastruktur
             </div>
-
             <div class="card-body">
                 <form method="post">
 
                     <div class="mb-3">
                         <label class="form-label">Nama Aset</label>
-                        <input type="text" name="nama_aset" class="form-control"
-                            value="<?= htmlspecialchars($d['nama_aset']) ?>" required>
+                        <input type="text" name="nama_aset" class="form-control" value="<?= htmlspecialchars($d['nama_aset']) ?>" required>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Jenis</label>
-                        <input type="text" name="jenis" class="form-control"
-                            value="<?= htmlspecialchars($d['jenis']) ?>" required>
+                        <input type="text" name="jenis" class="form-control" value="<?= htmlspecialchars($d['jenis']) ?>" required>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Tipe Aset</label>
-                        <input type="text" name="tipe_aset" class="form-control"
-                            value="<?= htmlspecialchars($d['tipe_aset']) ?>" required>
+                        <input type="text" name="tipe_aset" class="form-control" value="<?= htmlspecialchars($d['tipe_aset']) ?>" required>
                     </div>
 
-                    <!-- LOKASI DROPDOWN -->
                     <div class="mb-3">
                         <label class="form-label">Lokasi</label>
                         <select name="lokasi" class="form-control" required>
@@ -140,9 +140,7 @@ if (isset($_POST['simpan'])) {
                             <?php foreach ($lokasi_list as $lok) {
                                 $selected = ($d['lokasi'] == $lok['nama_lokasi']) ? "selected" : "";
                             ?>
-                                <option value="<?= $lok['nama_lokasi'] ?>" <?= $selected ?>>
-                                    <?= $lok['nama_lokasi'] ?>
-                                </option>
+                                <option value="<?= $lok['nama_lokasi'] ?>" <?= $selected ?>><?= $lok['nama_lokasi'] ?></option>
                             <?php } ?>
                         </select>
                     </div>
@@ -161,12 +159,33 @@ if (isset($_POST['simpan'])) {
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Tanggal Masuk</label>
-                        <input type="date" name="tanggal_masuk" class="form-control"
-                            value="<?= date('Y-m-d', strtotime($d['tanggal_masuk'])) ?>" required>
+                        <label class="form-label">Asal-Usul Barang</label>
+                        <select name="asal_usul" class="form-select" required>
+                            <?php
+                            $asal_options = ['Pembelian', 'Hibah', 'Sewa'];
+                            foreach ($asal_options as $opt_asal) {
+                                $selected_asal = ($d['asal_usul'] == $opt_asal) ? 'selected' : '';
+                                $label_asal = $opt_asal;
+                                if ($opt_asal == 'Pembelian') $label_asal = 'Pembelian / Anggaran RS';
+                                if ($opt_asal == 'Hibah') $label_asal = 'Hibah / Bantuan';
+
+                                echo "<option value='$opt_asal' $selected_asal>$label_asal</option>";
+                            }
+                            ?>
+                        </select>
                     </div>
 
-                    <div class="d-flex justify-content-end gap-2">
+                    <div class="mb-3">
+                        <label class="form-label">Harga Perolehan / Nilai Aset (Rp)</label>
+                        <input type="number" name="harga" class="form-control" value="<?= htmlspecialchars($d['harga']) ?>" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Tanggal Masuk</label>
+                        <input type="date" name="tanggal_masuk" class="form-control" value="<?= date('Y-m-d', strtotime($d['tanggal_masuk'])) ?>" required>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 mt-4">
                         <button type="submit" name="simpan" class="btn btn-success px-4">
                             <i class="bi bi-save"></i> Simpan
                         </button>
@@ -179,7 +198,6 @@ if (isset($_POST['simpan'])) {
             </div>
         </div>
     </div>
-
 </body>
 
 </html>
