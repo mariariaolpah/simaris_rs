@@ -1,0 +1,47 @@
+<?php
+session_start();
+if (!isset($_SESSION['id_pengguna'])) {
+    header("Location: ../login.php");
+    exit;
+}
+
+include(__DIR__ . '/../config/koneksi.php');
+
+// ==================== FILTER DATA ==================== //
+$search  = $_GET['search'] ?? '';
+$status  = $_GET['status'] ?? '';
+$dari    = $_GET['dari'] ?? '';
+$sampai  = $_GET['sampai'] ?? '';
+
+$where = [];
+if ($search != '')  $where[] = "(nama_aset LIKE '%$search%' OR keterangan LIKE '%$search%')";
+if ($status != '')  $where[] = "status = '$status'";
+if ($dari != '')    $where[] = "tanggal >= '$dari'";
+if ($sampai != '')  $where[] = "tanggal <= '$sampai'";
+
+$whereSQL = count($where) ? 'WHERE ' . implode(' AND ', $where) : '';
+
+// ==================== QUERY DATA ==================== //
+$sql = "SELECT * FROM kerusakan $whereSQL ORDER BY tanggal DESC";
+$res = mysqli_query($koneksi, $sql);
+
+// ==================== HEADER EXPORT ==================== //
+header('Content-Type: text/csv; charset=utf-8');
+header('Content-Disposition: attachment; filename=laporan_kerusakan_aset_' . date('Ymd_His') . '.csv');
+
+// ==================== TULIS KE FILE ==================== //
+$out = fopen('php://output', 'w');
+fputcsv($out, ['No', 'Nama Aset', 'Status', 'Tanggal', 'Keterangan']);
+
+$no = 1;
+while ($r = mysqli_fetch_assoc($res)) {
+    fputcsv($out, [
+        $no++,
+        $r['nama_aset'],
+        $r['status'],
+        $r['tanggal'],
+        $r['keterangan']
+    ]);
+}
+fclose($out);
+exit;
