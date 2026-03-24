@@ -176,8 +176,8 @@ while ($row = mysqli_fetch_assoc($query)) {
                         </div>
                     </div>
 
-                    <div class="card-body">
-                        <table class="table table-bordered table-hover text-center align-middle">
+                    <div class="card-body" style="overflow-x: auto;">
+                        <table class="table table-bordered table-hover text-center align-middle" style="white-space: nowrap;">
                             <thead class="table-light">
                                 <tr>
                                     <th>#</th>
@@ -189,13 +189,14 @@ while ($row = mysqli_fetch_assoc($query)) {
                                     <th>Asal-Usul</th>
                                     <th>Harga (Rp)</th>
                                     <th>Tanggal Masuk</th>
+                                    <th>Dokumen</th>
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php if (empty($aset_list)): ?>
                                     <tr>
-                                        <td colspan="10">Belum ada data aset.</td>
+                                        <td colspan="11">Belum ada data aset.</td>
                                     </tr>
                                 <?php else: ?>
                                     <?php foreach ($aset_list as $i => $a): ?>
@@ -209,6 +210,17 @@ while ($row = mysqli_fetch_assoc($query)) {
                                             <td><?= htmlspecialchars($a['asal_usul']) ?></td>
                                             <td>Rp <?= number_format($a['harga'], 0, ',', '.') ?></td>
                                             <td><?= htmlspecialchars($a['tanggal_masuk']) ?></td>
+
+                                            <td>
+                                                <?php if (!empty($a['dokumen'])): ?>
+                                                    <a href="../assets/dokumen/<?= htmlspecialchars($a['dokumen']) ?>" target="_blank" class="btn btn-info btn-sm text-white">
+                                                        <i class="bi bi-file-earmark-text"></i> Lihat
+                                                    </a>
+                                                <?php else: ?>
+                                                    <span class="text-muted">-</span>
+                                                <?php endif; ?>
+                                            </td>
+
                                             <td class="btn-action">
                                                 <a href="aset_edit.php?id=<?= $a['id_aset'] ?>" class="btn btn-warning btn-sm">
                                                     <i class="bi bi-pencil-square"></i>

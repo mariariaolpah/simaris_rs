@@ -1,43 +1,52 @@
-\<?php
-    session_start();
-    if (!isset($_SESSION['id_pengguna'])) {
-        header("Location: ../login.php");
-        exit;
-    }
+<?php
+session_start();
+if (!isset($_SESSION['id_pengguna'])) {
+    header("Location: ../login.php");
+    exit;
+}
 
-    include(__DIR__ . '/../config/koneksi.php');
+include(__DIR__ . '/../config/koneksi.php');
 
-    // Ambil ID aset
-    $id = intval($_GET['id']);
+// Ambil ID aset
+$id = intval($_GET['id']);
 
-    // Ambil data aset
-    $data = mysqli_query($koneksi, "SELECT * FROM aset WHERE id_aset = $id");
-    $d = mysqli_fetch_assoc($data);
+// Ambil data aset
+$data = mysqli_query($koneksi, "SELECT * FROM aset WHERE id_aset = $id");
+$d = mysqli_fetch_assoc($data);
 
-    if (!$d) {
-        echo "<script>alert('Data aset tidak ditemukan');window.location='aset.php';</script>";
-        exit;
-    }
+if (!$d) {
+    echo "<script>alert('Data aset tidak ditemukan');window.location='aset.php';</script>";
+    exit;
+}
 
-    // Ambil daftar lokasi
-    $lokasi_list = [];
-    $lokasi_query = mysqli_query($koneksi, "SELECT * FROM lokasi_aset ORDER BY nama_lokasi ASC");
-    while ($row = mysqli_fetch_assoc($lokasi_query)) {
-        $lokasi_list[] = $row;
-    }
+// Ambil daftar lokasi
+$lokasi_list = [];
+$lokasi_query = mysqli_query($koneksi, "SELECT * FROM lokasi_aset ORDER BY nama_lokasi ASC");
+while ($row = mysqli_fetch_assoc($lokasi_query)) {
+    $lokasi_list[] = $row;
+}
 
-    // Simpan perubahan
-    if (isset($_POST['simpan'])) {
-        $nama = mysqli_real_escape_string($koneksi, $_POST['nama_aset']);
-        $jenis = mysqli_real_escape_string($koneksi, $_POST['jenis']);
-        $tipe_aset = mysqli_real_escape_string($koneksi, $_POST['tipe_aset']);
-        $lokasi = mysqli_real_escape_string($koneksi, $_POST['lokasi']);
-        $kondisi = mysqli_real_escape_string($koneksi, $_POST['kondisi']);
-        $tanggal = $_POST['tanggal_masuk'];
+// Simpan perubahan
+if (isset($_POST['simpan'])) {
+    $nama = mysqli_real_escape_string($koneksi, $_POST['nama_aset']);
+    $jenis = mysqli_real_escape_string($koneksi, $_POST['jenis']);
+    $tipe_aset = mysqli_real_escape_string($koneksi, $_POST['tipe_aset']);
+    $lokasi = mysqli_real_escape_string($koneksi, $_POST['lokasi']);
+    $kondisi = mysqli_real_escape_string($koneksi, $_POST['kondisi']);
+    $tanggal = $_POST['tanggal_masuk'];
+    $asal_usul = mysqli_real_escape_string($koneksi, $_POST['asal_usul']);
+    $harga = mysqli_real_escape_string($koneksi, $_POST['harga']);
 
-        // Fitur Tambahan Skripsi
-        $asal_usul = mysqli_real_escape_string($koneksi, $_POST['asal_usul']);
-        $harga = mysqli_real_escape_string($koneksi, $_POST['harga']);
+    // REVISI: Logika Upload File untuk Edit Data
+    $nama_file = $_FILES['dokumen_aset']['name'];
+    $tmp_file = $_FILES['dokumen_aset']['tmp_name'];
+    $folder_simpan = "../assets/dokumen/";
+
+    // Jika user mengunggah file baru
+    if (!empty($nama_file)) {
+        $nama_file_baru = time() . '_' . $nama_file;
+        $path = $folder_simpan . $nama_file_baru;
+        move_uploaded_file($tmp_file, $path);
 
         mysqli_query($koneksi, "
         UPDATE aset SET 
@@ -48,13 +57,27 @@
             kondisi = '$kondisi',
             asal_usul = '$asal_usul',
             harga = '$harga',
+            tanggal_masuk = '$tanggal',
+            dokumen = '$nama_file_baru'
+        WHERE id_aset = $id ");
+    } else {
+        // Jika tidak ada file baru yang diunggah, update data teksnya saja
+        mysqli_query($koneksi, "
+        UPDATE aset SET 
+            nama_aset = '$nama',
+            jenis = '$jenis',
+            tipe_aset = '$tipe_aset',
+            lokasi = '$lokasi',
+            kondisi = '$kondisi',
+            asal_usul = '$asal_usul',
+            harga = '$harga',
             tanggal_masuk = '$tanggal'
-        WHERE id_aset = $id
-    ");
-
-        echo "<script>alert('Aset berhasil diubah');window.location='aset.php';</script>";
+        WHERE id_aset = $id ");
     }
-    ?>
+
+    echo "<script>alert('Aset berhasil diubah');window.location='aset.php';</script>";
+}
+?>
 
 <!DOCTYPE html>
 <html lang="id">
@@ -73,6 +96,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            padding: 20px 0;
         }
 
         .container-form {
@@ -116,7 +140,7 @@
                 <i class="bi bi-pencil-square"></i> Edit Aset / Infrastruktur
             </div>
             <div class="card-body">
-                <form method="post">
+                <form method="post" enctype="multipart/form-data">
 
                     <div class="mb-3">
                         <label class="form-label">Nama Aset</label>
@@ -185,9 +209,19 @@
                         <input type="date" name="tanggal_masuk" class="form-control" value="<?= date('Y-m-d', strtotime($d['tanggal_masuk'])) ?>" required>
                     </div>
 
+                    <div class="mb-3">
+                        <label class="form-label">Ganti Foto / Dokumen (Opsional)</label>
+                        <input type="file" name="dokumen_aset" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
+                        <?php if (!empty($d['dokumen'])): ?>
+                            <small class="text-muted d-block mt-2">
+                                File tersimpan saat ini: <a href="../assets/dokumen/<?= htmlspecialchars($d['dokumen']) ?>" target="_blank" class="fw-bold">Lihat Dokumen</a>
+                            </small>
+                        <?php endif; ?>
+                    </div>
+
                     <div class="d-flex justify-content-end gap-2 mt-4">
                         <button type="submit" name="simpan" class="btn btn-success px-4">
-                            <i class="bi bi-save"></i> Simpan
+                            <i class="bi bi-save"></i> Update
                         </button>
                         <a href="aset.php" class="btn btn-secondary px-4">
                             <i class="bi bi-x-circle"></i> Batal

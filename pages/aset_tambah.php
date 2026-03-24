@@ -26,8 +26,29 @@ if (isset($_POST['simpan'])) {
     $asal_usul = mysqli_real_escape_string($koneksi, $_POST['asal_usul']);
     $harga = mysqli_real_escape_string($koneksi, $_POST['harga']);
 
-    mysqli_query($koneksi, "INSERT INTO aset (nama_aset, jenis, tipe_aset, lokasi, kondisi, asal_usul, harga, tanggal_masuk)
-                            VALUES ('$nama', '$jenis', '$tipe', '$lokasi', '$kondisi', '$asal_usul', '$harga', '$tanggal')");
+    // --- REVISI FITUR UPLOAD DOKUMEN ---
+    $nama_file = $_FILES['dokumen_aset']['name'];
+    $tmp_file = $_FILES['dokumen_aset']['tmp_name'];
+
+    // Tentukan folder penyimpanan file (pastikan folder ini sudah Anda buat)
+    $folder_simpan = "../assets/dokumen/";
+
+    if (!empty($nama_file)) {
+        // Buat nama file unik agar tidak bentrok jika namanya sama
+        $nama_file_baru = time() . '_' . $nama_file;
+        $path = $folder_simpan . $nama_file_baru;
+
+        // Pindahkan file ke folder tujuan
+        move_uploaded_file($tmp_file, $path);
+
+        // Simpan ke database beserta nama filenya
+        mysqli_query($koneksi, "INSERT INTO aset (nama_aset, jenis, tipe_aset, lokasi, kondisi, asal_usul, harga, tanggal_masuk, dokumen)
+                                VALUES ('$nama', '$jenis', '$tipe', '$lokasi', '$kondisi', '$asal_usul', '$harga', '$tanggal', '$nama_file_baru')");
+    } else {
+        // Jika petugas tidak mengunggah file, simpan tanpa kolom dokumen
+        mysqli_query($koneksi, "INSERT INTO aset (nama_aset, jenis, tipe_aset, lokasi, kondisi, asal_usul, harga, tanggal_masuk)
+                                VALUES ('$nama', '$jenis', '$tipe', '$lokasi', '$kondisi', '$asal_usul', '$harga', '$tanggal')");
+    }
 
     echo "<script>alert('Aset berhasil ditambahkan');window.location='aset.php';</script>";
 }
@@ -49,6 +70,8 @@ if (isset($_POST['simpan'])) {
             display: flex;
             justify-content: center;
             align-items: center;
+            padding: 20px 0;
+            /* Tambahan padding agar form tidak terpotong di layar kecil */
         }
 
         .container-form {
@@ -93,7 +116,7 @@ if (isset($_POST['simpan'])) {
                 <i class="bi bi-plus-circle"></i> Tambah Aset / Infrastruktur
             </div>
             <div class="card-body">
-                <form method="post">
+                <form method="post" enctype="multipart/form-data">
 
                     <div class="mb-3">
                         <label class="form-label">Nama Aset</label>
@@ -150,6 +173,12 @@ if (isset($_POST['simpan'])) {
                     <div class="mb-3">
                         <label class="form-label">Tanggal Masuk</label>
                         <input type="date" name="tanggal_masuk" class="form-control" value="<?= date('Y-m-d') ?>" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Upload Foto / Dokumen (JPG/PDF)</label>
+                        <input type="file" name="dokumen_aset" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
+                        <small class="text-muted">Opsional: Format JPG/PNG/PDF</small>
                     </div>
 
                     <div class="d-flex justify-content-end gap-2 mt-4">
