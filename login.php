@@ -2,47 +2,44 @@
 session_start();
 include(__DIR__ . '/config/koneksi.php');
 
-// ==== PROSES LOGIN ====
 if (isset($_POST['login'])) {
+
     $username = mysqli_real_escape_string($koneksi, $_POST['username']);
-    $password = md5($_POST['password']); // kode baru untuk skripsi // jangan di-escape, karena nanti untuk password_verify
+    $password_input = $_POST['password'];
 
-    // cek data pengguna berdasarkan username saja
-    $cek = mysqli_query($koneksi, "SELECT * FROM pengguna WHERE username='$username'");
+    $query = mysqli_query($koneksi, "SELECT * FROM pengguna WHERE username='$username'");
 
-    if (!$cek) {
-        die("Query gagal: " . mysqli_error($koneksi));
-    }
+    if (mysqli_num_rows($query) > 0) {
+        $user = mysqli_fetch_assoc($query);
 
-    if (mysqli_num_rows($cek) > 0) {
-        $user = mysqli_fetch_assoc($cek);
+        // cek 2 kemungkinan: md5 ATAU biasa
+        if (
+            $user['password'] == md5($password_input) ||
+            $user['password'] == $password_input
+        ) {
 
-        // verifikasi password yang sudah di-hash
-        if ($password == $user['password']) {
-            // cek status user
-            if (($user['status'] ?? 'aktif') !== 'aktif') {
-                $error = "Akun kamu sudah dinonaktifkan. Silahkan hubungi admin.";
+            // cek status
+            if ($user['status'] != 'aktif') {
+                $error = "Akun tidak aktif!";
             } else {
-                // simpan session
+
                 $_SESSION['id_pengguna'] = $user['id_pengguna'];
                 $_SESSION['nama_pengguna'] = $user['nama_pengguna'];
                 $_SESSION['role'] = $user['role'];
-                $_SESSION['level'] = $user['level']; // <-- pastikan ambil level, bukan role
 
-                // arahkan sesuai role
-                if ($_SESSION['role'] == 'user') {
-                    header("Location: pages/dashboard_user.php");
-                    exit;
-                } else if ($_SESSION['role'] == 'admin') {
+                // arahkan
+                if ($user['role'] == 'admin') {
                     header("Location: pages/dashboard.php");
-                    exit;
                 } else {
-                    $error = "Role pengguna tidak valid!";
+                    header("Location: pages/dashboard_user.php");
                 }
+                exit;
             }
         } else {
-            $error = "Username atau password salah!";
+            $error = "Password salah!";
         }
+    } else {
+        $error = "Username tidak ditemukan!";
     }
 }
 ?>
