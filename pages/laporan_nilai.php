@@ -1,98 +1,127 @@
 <?php
 session_start();
-// Proteksi halaman: Hanya admin yang bisa akses laporan keuangan
 if (!isset($_SESSION['id_pengguna']) || $_SESSION['role'] !== 'admin') {
     header("Location: ../login.php");
     exit;
 }
 
-require('../config/fpdf.php');
-include('../config/koneksi.php');
+include(__DIR__ . '/../config/koneksi.php');
+include(__DIR__ . '/../header.php');
+?>
 
-// Query mengambil data aset yang memiliki harga
-$sql = "SELECT * FROM aset WHERE harga > 0 ORDER BY tanggal_masuk DESC";
-$result = mysqli_query($koneksi, $sql);
+<style>
+    .filter-form input {
+        border-radius: 8px;
+        padding: 6px 10px;
+        border: 1px solid #ccc;
+    }
 
-// Query hitung total seluruh nilai aset
-$total_query = mysqli_query($koneksi, "SELECT SUM(harga) as total_duit FROM aset");
-$total_res = mysqli_fetch_assoc($total_query);
-$total_seluruh = $total_res['total_duit'] ? $total_res['total_duit'] : 0;
+    .card-header {
+        background: linear-gradient(90deg, #2c7a7b, #1cc88a);
+        color: #fff;
+        font-weight: 600;
+    }
 
-// Inisialisasi PDF Landscape
-$pdf = new FPDF('L', 'mm', 'A4');
-$pdf->AddPage();
+    .stats {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
 
-// ---------- KOP SURAT (Dua Logo) ----------
-$y = 8;
-$logoLeft  = realpath(__DIR__ . '/../assets/img/logo_dokpol.png');
-$logoRight = realpath(__DIR__ . '/../assets/img/logo_rs.jpg');
+    .stat {
+        background: #fff;
+        padding: 10px 14px;
+        border-radius: 8px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, .05);
+    }
+</style>
 
-if (file_exists($logoLeft)) $pdf->Image($logoLeft, 15, $y, 22);
-if (file_exists($logoRight)) $pdf->Image($logoRight, 260, $y, 22);
+<div class="dashboard-header">
+    <h3 class="mb-0">Laporan Nilai Aset</h3>
+</div>
 
-$pdf->SetFont('Arial', 'B', 15);
-$pdf->SetXY(0, $y + 2);
-$pdf->Cell(0, 10, 'RUMKIT BHAYANGKARA TK. III BANJARMASIN', 0, 1, 'C');
-$pdf->SetFont('Arial', '', 11);
-$pdf->Cell(0, 5, 'Jl. A. Yani Km. 3,5 Banjarmasin 70235', 0, 1, 'C');
-$pdf->Line(10, 35, 287, 35); // Garis pembatas kop
-$pdf->Ln(15);
+<div class="content">
 
-// ---------- JUDUL LAPORAN ----------
-$pdf->SetFont('Arial', 'B', 14);
-$pdf->Cell(0, 10, 'LAPORAN REKAPITULASI NILAI PEROLEHAN ASET', 0, 1, 'C');
-$pdf->SetFont('Arial', '', 10);
-$pdf->Cell(0, 5, 'Dicetak pada: ' . date('d/m/Y H:i'), 0, 1, 'C');
-$pdf->Ln(5);
+    <?php
+    $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+    $perPage = 10;
 
-// ---------- HEADER TABEL (Warna Biru SIMARIS) ----------
-$pdf->SetFont('Arial', 'B', 10);
-$pdf->SetFillColor(52, 152, 219); // Biru sesuai aset_cetak
-$pdf->SetTextColor(255);
+    $search = $_GET['search'] ?? '';
+    $dari = $_GET['dari'] ?? '';
+    $sampai = $_GET['sampai'] ?? '';
 
-// Lebar kolom
-$w = [10, 80, 45, 40, 50, 50];
+    $where = ["harga > 0"];
 
-$pdf->SetX(11);
-$pdf->Cell($w[0], 10, 'No', 1, 0, 'C', true);
-$pdf->Cell($w[1], 10, 'Nama Aset / Infrastruktur', 1, 0, 'C', true);
-$pdf->Cell($w[2], 10, 'Asal-Usul', 1, 0, 'C', true);
-$pdf->Cell($w[3], 10, 'Tgl Masuk', 1, 0, 'C', true);
-$pdf->Cell($w[4], 10, 'Harga Perolehan', 1, 0, 'C', true);
-$pdf->Cell($w[5], 10, 'Kondisi', 1, 1, 'C', true);
+    if ($search != '') $where[] = "(nama_aset LIKE '%$search%' OR asal_usul LIKE '%$search%')";
+    if ($dari != '') $where[] = "tanggal_masuk >= '$dari'";
+    if ($sampai != '') $where[] = "tanggal_masuk <= '$sampai'";
 
-// ---------- ISI TABEL ----------
-$pdf->SetFont('Arial', '', 10);
-$pdf->SetTextColor(0);
-$no = 1;
+    $whereSQL = 'WHERE ' . implode(' AND ', $where);
 
-while ($row = mysqli_fetch_assoc($result)) {
-    $pdf->SetX(11);
-    $pdf->Cell($w[0], 8, $no++, 1, 0, 'C');
-    $pdf->Cell($w[1], 8, $row['nama_aset'], 1);
-    $pdf->Cell($w[2], 8, $row['asal_usul'], 1, 0, 'C');
-    $pdf->Cell($w[3], 8, date('d/m/Y', strtotime($row['tanggal_masuk'])), 1, 0, 'C');
-    $pdf->Cell($w[4], 8, 'Rp ' . number_format($row['harga'], 0, ',', '.'), 1, 0, 'R');
-    $pdf->Cell($w[5], 8, $row['kondisi'], 1, 1, 'C');
-}
+    // statistik
+    $statQ = mysqli_query($koneksi, "SELECT COUNT(*) as total, SUM(harga) as total_nilai FROM aset $whereSQL");
+    $stat = mysqli_fetch_assoc($statQ);
 
-// ---------- TOTAL DI BAGIAN BAWAH ----------
-$pdf->SetX(11);
-$pdf->SetFont('Arial', 'B', 10);
-$pdf->SetFillColor(240, 240, 240);
-$pdf->Cell($w[0] + $w[1] + $w[2] + $w[3], 10, 'TOTAL KESELURUHAN NILAI INVESTASI ASET', 1, 0, 'R', true);
-$pdf->Cell($w[4], 10, 'Rp ' . number_format($total_seluruh, 0, ',', '.'), 1, 0, 'R', true);
-$pdf->Cell($w[5], 10, '', 1, 1, 'C', true);
+    // data
+    $countQ = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM aset $whereSQL");
+    $totalRow = mysqli_fetch_assoc($countQ)['total'];
 
-// ---------- TANDA TANGAN ----------
-$pdf->Ln(15);
-$pdf->Cell(220);
-$pdf->Cell(0, 5, 'Banjarmasin, ' . date('d F Y'), 0, 1, 'C');
-$pdf->Cell(220);
-$pdf->Cell(0, 5, 'Kepala Urusan Logistik,', 0, 1, 'C');
-$pdf->Ln(20);
-$pdf->Cell(220);
-$pdf->SetFont('Arial', 'BU', 10);
-$pdf->Cell(0, 5, '( ' . $_SESSION['nama_pengguna'] . ' )', 0, 1, 'C');
+    $offset = ($page - 1) * $perPage;
 
-$pdf->Output('I', 'Laporan_Nilai_Aset.pdf');
+    $dataQ = mysqli_query($koneksi, "SELECT * FROM aset $whereSQL ORDER BY tanggal_masuk DESC LIMIT $offset,$perPage");
+    ?>
+
+    <!-- FILTER -->
+    <div class="d-flex justify-content-between mb-3">
+        <form class="d-flex gap-2 filter-form" method="GET">
+            <input type="text" name="search" placeholder="Cari aset..." value="<?= $search ?>">
+            <input type="date" name="dari" value="<?= $dari ?>">
+            <input type="date" name="sampai" value="<?= $sampai ?>">
+            <button class="btn btn-success btn-sm">🔍 Filter</button>
+        </form>
+
+        <a href="laporan_nilai_cetak.php?<?= http_build_query($_GET) ?>"
+            class="btn btn-danger btn-sm" target="_blank">🖨 Cetak PDF</a>
+    </div>
+
+    <!-- STAT -->
+    <div class="stats">
+        <div class="stat">Jumlah: <b><?= $stat['total'] ?></b></div>
+        <div class="stat">Total Nilai: <b>Rp <?= number_format($stat['total_nilai'], 0, ',', '.') ?></b></div>
+    </div>
+
+    <!-- TABEL -->
+    <div class="card">
+        <div class="card-header">Data Nilai Aset</div>
+        <div class="card-body p-0">
+            <table class="table table-bordered">
+                <tr>
+                    <th>No</th>
+                    <th>Nama Aset</th>
+                    <th>Asal</th>
+                    <th>Tanggal</th>
+                    <th>Harga</th>
+                    <th>Kondisi</th>
+                </tr>
+
+                <?php
+                $no = $offset + 1;
+                while ($r = mysqli_fetch_assoc($dataQ)) {
+                    echo "<tr>
+                    <td>$no</td>
+                    <td>{$r['nama_aset']}</td>
+                    <td>{$r['asal_usul']}</td>
+                    <td>{$r['tanggal_masuk']}</td>
+                    <td>Rp " . number_format($r['harga'], 0, ',', '.') . "</td>
+                    <td>{$r['kondisi']}</td>
+                </tr>";
+                    $no++;
+                }
+                ?>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<?php include(__DIR__ . '/../footer.php'); ?>

@@ -12,35 +12,45 @@ include(__DIR__ . '/../config/koneksi.php');
 function getCount($koneksi, $table, $tahun = null)
 {
     $whereExtra = '';
-    $sql = '';
 
     switch ($table) {
         case 'aset':
             $tanggalKolom = 'tanggal_masuk';
             break;
+
         case 'kerusakan':
         case 'perawatan':
-        case 'perbaikan':
             $tanggalKolom = 'tanggal';
             break;
+
+        case 'perbaikan':
+            $table = 'kerusakan';
+            $tanggalKolom = 'tanggal';
+            $whereExtra = " AND status IN ('Dalam Perbaikan','Selesai Diperbaiki')";
+            break;
+
         case 'perawatan_berjalan':
             $table = 'perawatan';
             $tanggalKolom = 'tanggal';
-            $whereExtra = " AND status IN ('Belum Dimulai', 'Sedang Proses')";
+            $whereExtra = " AND status IN ('Belum Dimulai','Sedang Proses')";
             break;
+
         case 'peminjaman':
             $tanggalKolom = 'tanggal_pinjam';
             break;
+
         case 'audit_fisik':
             $tanggalKolom = 'tanggal_audit';
             break;
+
+        case 'nilai_aset':
+            $table = 'aset';
+            $tanggalKolom = 'tanggal_masuk';
+            $whereExtra = " AND harga > 0";
+            break;
+
         default:
             $tanggalKolom = 'tanggal';
-    }
-
-    if ($table === 'perbaikan') {
-        $table = 'kerusakan';
-        $whereExtra .= " AND (status LIKE '%Perbaiki%' OR status LIKE '%Perbaikan%' OR status LIKE '%Selesai%')";
     }
 
     if ($tahun) {
@@ -58,7 +68,7 @@ function getCount($koneksi, $table, $tahun = null)
     return (int)($data['total'] ?? 0);
 }
 
-// =======================
+/// =======================
 // AMBIL DATA LAPORAN (GENAP 8)
 // =======================
 $tahunSekarang = date('Y');
@@ -71,7 +81,7 @@ $laporan_list = [
     ['Laporan Perawatan Berjalan', getCount($koneksi, 'perawatan_berjalan', $tahunSekarang), $tahunSekarang],
     ['Laporan Peminjaman Aset', getCount($koneksi, 'peminjaman', $tahunSekarang), $tahunSekarang],
     ['Laporan Hasil Audit Fisik', getCount($koneksi, 'audit_fisik', $tahunSekarang), $tahunSekarang],
-    ['Laporan Rekapitulasi Nilai Aset', getCount($koneksi, 'aset'), 'Semua']
+    ['Laporan Rekapitulasi Nilai Aset', getCount($koneksi, 'nilai_aset'), 'Semua']
 ];
 
 function getReportLink($jenis)
@@ -88,9 +98,9 @@ function getReportLink($jenis)
         case 'Laporan Perawatan Berjalan':
             return 'laporan_perawatan_berjalan.php';
         case 'Laporan Peminjaman Aset':
-            return 'peminjaman_cetak.php';
+            return 'laporan_peminjaman.php';
         case 'Laporan Hasil Audit Fisik':
-            return 'audit_cetak.php';
+            return 'laporan_audit.php';
         case 'Laporan Rekapitulasi Nilai Aset':
             return 'laporan_nilai.php';
         default:
