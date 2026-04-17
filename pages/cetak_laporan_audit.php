@@ -18,55 +18,76 @@ $result = mysqli_query($koneksi, $sql);
 $pdf = new FPDF('L', 'mm', 'A4');
 $pdf->AddPage();
 
-// ---------- Kop surat (Dua Logo) ----------
-$y = 8;
+// ==================== HEADER ==================== //
 $logoLeft  = realpath(__DIR__ . '/../assets/img/logo_dokpol.png');
 $logoRight = realpath(__DIR__ . '/../assets/img/logo_rs.jpg');
 
-// Cek file logo ada atau tidak agar tidak error
-if (file_exists($logoLeft)) $pdf->Image($logoLeft, 15, $y, 22);
-if (file_exists($logoRight)) $pdf->Image($logoRight, 260, $y, 22);
+if (file_exists($logoLeft)) $pdf->Image($logoLeft, 15, 8, 25);
+if (file_exists($logoRight)) $pdf->Image($logoRight, 252, 8, 25);
 
-$pdf->SetFont('Arial', 'B', 15);
-$pdf->SetXY(0, $y + 2);
-$pdf->Cell(0, 10, 'RUMKIT BHAYANGKARA TK. III BANJARMASIN', 0, 1, 'C');
-$pdf->SetFont('Arial', '', 11);
-$pdf->Cell(0, 5, 'Jl. A. Yani Km. 3,5 Banjarmasin 70235', 0, 1, 'C');
-$pdf->Ln(15);
+$pdf->SetFont('Arial', 'B', 16);
+$pdf->SetXY(0, 12);
+$pdf->Cell(0, 6, 'RUMKIT BHAYANGKARA TK. III BANJARMASIN', 0, 1, 'C');
 
-// ---------- Judul Laporan ----------
-$pdf->SetFont('Arial', 'B', 14);
+$pdf->SetFont('Arial', '', 12);
+$pdf->Cell(0, 6, 'Jl. A. Yani Km. 3,5 Banjarmasin 70235', 0, 1, 'C');
+
+$pdf->SetY(32);
+$pdf->SetFont('Arial', 'B', 16);
 $pdf->Cell(0, 10, 'LAPORAN HASIL AUDIT FISIK ASET (STOCK OPNAME)', 0, 1, 'C');
-$pdf->Ln(5);
+$pdf->Ln(4);
 
-// ---------- Header Tabel (Warna Biru seperti Aset) ----------
-$pdf->SetFont('Arial', 'B', 10);
-$pdf->SetFillColor(52, 152, 219); // Warna Biru
+// ==================== TABEL ==================== //
+$widths = [12, 65, 45, 35, 40, 80];
+$header = ['No', 'Nama Aset', 'Lokasi', 'Tgl Audit', 'Kondisi', 'Keterangan / Auditor'];
+
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->SetFillColor(72, 201, 176);
 $pdf->SetTextColor(255);
 
-// Pengaturan Lebar Kolom (Total 260mm agar center di A4 Landscape)
-$w = [10, 65, 45, 35, 35, 70];
+foreach ($header as $i => $col) {
+    $pdf->Cell($widths[$i], 11, $col, 1, 0, 'C', true);
+}
+$pdf->Ln();
 
-$pdf->SetX(11);
-$pdf->Cell($w[0], 10, 'No', 1, 0, 'C', true);
-$pdf->Cell($w[1], 10, 'Nama Aset', 1, 0, 'C', true);
-$pdf->Cell($w[2], 10, 'Lokasi', 1, 0, 'C', true);
-$pdf->Cell($w[3], 10, 'Tgl Audit', 1, 0, 'C', true);
-$pdf->Cell($w[4], 10, 'Kondisi Fisik', 1, 0, 'C', true);
-$pdf->Cell($w[5], 10, 'Keterangan / Auditor', 1, 1, 'C', true);
-
-// ---------- Isi Tabel ----------
 $pdf->SetFont('Arial', '', 10);
 $pdf->SetTextColor(0);
+
 $i = 1;
 while ($row = mysqli_fetch_assoc($result)) {
-    $pdf->SetX(11);
-    $pdf->Cell($w[0], 8, $i++, 1, 0, 'C');
-    $pdf->Cell($w[1], 8, $row['nama_aset'], 1);
-    $pdf->Cell($w[2], 8, $row['lokasi'], 1);
-    $pdf->Cell($w[3], 8, date('d/m/Y', strtotime($row['tanggal_audit'])), 1, 0, 'C');
-    $pdf->Cell($w[4], 8, $row['kondisi_fisik'], 1, 0, 'C');
-    $pdf->Cell($w[5], 8, $row['keterangan'] . ' (Oleh: ' . $row['auditor'] . ')', 1, 1);
+    $pdf->Cell($widths[0], 9, $i++, 1, 0, 'C');
+    $pdf->Cell($widths[1], 9, substr($row['nama_aset'], 0, 35), 1);
+    $pdf->Cell($widths[2], 9, substr($row['lokasi'], 0, 30), 1);
+    $pdf->Cell($widths[3], 9, date('d/m/Y', strtotime($row['tanggal_audit'])), 1, 0, 'C');
+    $pdf->Cell($widths[4], 9, substr($row['kondisi_fisik'], 0, 20), 1, 0, 'C');
+    $pdf->Cell($widths[5], 9, substr($row['keterangan'] . ' (Oleh: ' . $row['auditor'] . ')', 0, 40), 1, 1);
 }
 
+// ==================== FOOTER (RAPI + KANAN) ==================== //
+$pdf->SetY(-50);
+$pdf->SetFont('Arial', '', 11);
+
+$pdf->Cell(0, 6, 'Banjarmasin, ' . date('d F Y'), 0, 1, 'R');
+$pdf->Cell(0, 6, 'Mengetahui,', 0, 1, 'R');
+$pdf->Cell(0, 6, 'Administrator', 0, 1, 'R');
+
+$pdf->Ln(10);
+
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Cell(0, 6, $_SESSION['nama_pengguna'], 0, 1, 'R');
+
+$pdf->Ln(5);
+
+$pdf->SetFont('Arial', 'I', 9);
+$pdf->Cell(
+    0,
+    6,
+    'Dicetak pada: ' . date('d-m-Y H:i:s') . ' oleh ' . $_SESSION['nama_pengguna'],
+    0,
+    1,
+    'R'
+);
+
+// ==================== OUTPUT (HARUS PALING BAWAH) ==================== //
 $pdf->Output();
+exit;

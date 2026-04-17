@@ -7,80 +7,76 @@ if (!isset($_SESSION['id_pengguna'])) {
 include(__DIR__ . '/../config/koneksi.php');
 
 // =======================
-// FUNGSI HITUNG DATA
+// FUNGSI HITUNG DATA (FIXED)
 // =======================
-function getCount($koneksi, $table, $tahun = null)
+function getCount($koneksi, $jenis, $tahun = null)
 {
-    $whereExtra = '';
+    $where = "";
 
-    switch ($table) {
+    // filter tahun (kalau ada kolom tanggal)
+    $tahunFilter = $tahun ? "YEAR(%s) = '$tahun'" : "1=1";
+
+    switch ($jenis) {
+
         case 'aset':
-            $tanggalKolom = 'tanggal_masuk';
+            $sql = "SELECT COUNT(*) as total FROM aset";
             break;
 
         case 'kerusakan':
+            $sql = "SELECT COUNT(*) as total FROM kerusakan";
+            break;
+
         case 'perawatan':
-            $tanggalKolom = 'tanggal';
+            $sql = "SELECT COUNT(*) as total FROM perawatan";
             break;
 
         case 'perbaikan':
-            $table = 'kerusakan';
-            $tanggalKolom = 'tanggal';
-            $whereExtra = " AND status IN ('Dalam Perbaikan','Selesai Diperbaiki')";
+            $sql = "SELECT COUNT(*) as total 
+                    FROM kerusakan 
+                    WHERE status IN ('Dalam Perbaikan','Selesai Diperbaiki')";
             break;
 
         case 'perawatan_berjalan':
-            $table = 'perawatan';
-            $tanggalKolom = 'tanggal';
-            $whereExtra = " AND status IN ('Belum Dimulai','Sedang Proses')";
+            $sql = "SELECT COUNT(*) as total 
+                    FROM perawatan 
+                    WHERE status IN ('Belum Dimulai','Sedang Proses')";
             break;
 
         case 'peminjaman':
-            $tanggalKolom = 'tanggal_pinjam';
+            $sql = "SELECT COUNT(*) as total FROM peminjaman";
             break;
 
         case 'audit_fisik':
-            $tanggalKolom = 'tanggal_audit';
+            $sql = "SELECT COUNT(*) as total FROM audit_fisik";
             break;
 
         case 'nilai_aset':
-            $table = 'aset';
-            $tanggalKolom = 'tanggal_masuk';
-            $whereExtra = " AND harga > 0";
+            $sql = "SELECT COUNT(*) as total FROM aset WHERE harga > 0";
             break;
 
         default:
-            $tanggalKolom = 'tanggal';
-    }
-
-    if ($tahun) {
-        $sql = "SELECT COUNT(*) AS total 
-                FROM $table 
-                WHERE YEAR($tanggalKolom) = '$tahun' $whereExtra";
-    } else {
-        $sql = "SELECT COUNT(*) AS total 
-                FROM $table 
-                WHERE 1=1 $whereExtra";
+            return 0;
     }
 
     $res = mysqli_query($koneksi, $sql);
     $data = mysqli_fetch_assoc($res);
+
     return (int)($data['total'] ?? 0);
 }
 
-/// =======================
-// AMBIL DATA LAPORAN (GENAP 8)
+// =======================
+// AMBIL DATA LAPORAN
 // =======================
 $tahunSekarang = date('Y');
 
 $laporan_list = [
-    ['Laporan Aset', getCount($koneksi, 'aset', $tahunSekarang), $tahunSekarang],
-    ['Laporan Kerusakan', getCount($koneksi, 'kerusakan', $tahunSekarang), $tahunSekarang],
-    ['Laporan Perawatan', getCount($koneksi, 'perawatan', $tahunSekarang), $tahunSekarang],
-    ['Laporan Perbaikan', getCount($koneksi, 'perbaikan', $tahunSekarang), $tahunSekarang],
-    ['Laporan Perawatan Berjalan', getCount($koneksi, 'perawatan_berjalan', $tahunSekarang), $tahunSekarang],
-    ['Laporan Peminjaman Aset', getCount($koneksi, 'peminjaman', $tahunSekarang), $tahunSekarang],
-    ['Laporan Hasil Audit Fisik', getCount($koneksi, 'audit_fisik', $tahunSekarang), $tahunSekarang],
+    ['Laporan Aset', getCount($koneksi, 'aset'), $tahunSekarang],
+    ['Laporan Kerusakan', getCount($koneksi, 'kerusakan'), $tahunSekarang],
+    ['Laporan Perawatan', getCount($koneksi, 'perawatan'), $tahunSekarang],
+    ['Laporan Perbaikan', getCount($koneksi, 'perbaikan'), $tahunSekarang],
+    ['Laporan Perawatan Berjalan', getCount($koneksi, 'perawatan_berjalan'), $tahunSekarang],
+    ['Laporan Peminjaman Aset', getCount($koneksi, 'peminjaman'), $tahunSekarang],
+    ['Laporan Hasil Audit Fisik', getCount($koneksi, 'audit_fisik'), $tahunSekarang],
     ['Laporan Rekapitulasi Nilai Aset', getCount($koneksi, 'nilai_aset'), 'Semua']
 ];
 
@@ -159,6 +155,7 @@ function getReportLink($jenis)
 <body>
     <div id="wrapper">
         <?php include(__DIR__ . '/../sidebar.php'); ?>
+
         <div id="page-content-wrapper">
             <div class="dashboard-header">
                 <h3>LAPORAN</h3>
@@ -166,10 +163,12 @@ function getReportLink($jenis)
                     <span><i class="bi bi-person-circle"></i> <?= $_SESSION['nama_pengguna']; ?></span>
                 </div>
             </div>
+
             <div class="content">
                 <div class="card shadow-sm">
                     <div class="card-header">Data Laporan</div>
                     <div class="card-body table-responsive">
+
                         <table class="table table-bordered table-hover align-middle text-center">
                             <thead class="table-light">
                                 <tr>
@@ -181,23 +180,32 @@ function getReportLink($jenis)
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
+
                             <tbody>
-                                <?php foreach ($laporan_list as $i => $l):
-                                    $status = ($l[0] === 'Laporan Perawatan Berjalan') ? 'Sedang Proses' : 'Selesai';
-                                ?>
+                                <?php foreach ($laporan_list as $i => $l): ?>
+                                    <?php $status = ($l[0] === 'Laporan Perawatan Berjalan') ? 'Sedang Proses' : 'Selesai'; ?>
                                     <tr>
                                         <td><?= $i + 1 ?></td>
                                         <td class="text-start"><?= $l[0] ?></td>
                                         <td><?= $l[1] ?></td>
                                         <td><?= $l[2] ?></td>
-                                        <td><span class="badge bg-<?= $status === 'Selesai' ? 'success' : 'warning' ?>"><?= $status ?></span></td>
                                         <td>
-                                            <a href="<?= getReportLink($l[0]) ?>" target="_blank" class="btn btn-sm btn-success"><i class="bi bi-eye"></i> Lihat</a>
+                                            <span class="badge bg-<?= $status === 'Selesai' ? 'success' : 'warning' ?>">
+                                                <?= $status ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <a href="<?= getReportLink($l[0]) ?>" target="_blank"
+                                                class="btn btn-sm btn-success">
+                                                <i class="bi bi-eye"></i> Lihat
+                                            </a>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
+
                         </table>
+
                     </div>
                 </div>
             </div>

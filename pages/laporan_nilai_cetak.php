@@ -68,7 +68,9 @@ $pdf->Ln(5);
 // HEADER TABEL
 // =======================
 $pdf->SetFont('Arial', 'B', 10);
-$pdf->SetFillColor(52, 152, 219);
+
+// 🔥 SUDAH DISAMAKAN DENGAN LAPORAN ASET
+$pdf->SetFillColor(72, 201, 176);
 $pdf->SetTextColor(255);
 
 $w = [10, 80, 45, 40, 50, 50];
@@ -111,31 +113,33 @@ $pdf->Cell($w[4], 10, 'Rp ' . number_format($total_seluruh, 0, ',', '.'), 1, 0, 
 $pdf->Cell($w[5], 10, '', 1, 1, 'C', true);
 
 // =======================
-// TANDA TANGAN (KANAN RAPI)
+// TANDA TANGAN (RAPI KONSISTEN)
 // =======================
 $pdf->Ln(15);
 
-// Tanggal
-$pdf->SetFont('Arial', '', 10);
-$pdf->Cell(0, 5, 'Banjarmasin, ' . date('d F Y'), 0, 1, 'R');
+$pdf->SetFont('Arial', '', 11);
+$pdf->Cell(0, 6, 'Banjarmasin, ' . date('d F Y'), 0, 1, 'R');
+$pdf->Cell(0, 6, 'Mengetahui,', 0, 1, 'R');
+$pdf->Cell(0, 6, 'Administrator', 0, 1, 'R');
 
-// Mengetahui
-$pdf->Cell(0, 5, 'Mengetahui,', 0, 1, 'R');
-
-// Jabatan
-$pdf->Cell(0, 5, 'Administrator', 0, 1, 'R');
-
-// Jarak tanda tangan
 $pdf->Ln(18);
 
-// Nama
-$pdf->SetFont('Arial', 'BU', 10);
-$pdf->Cell(0, 5, $_SESSION['nama_pengguna'], 0, 1, 'R');
+$pdf->SetFont('Arial', 'BU', 11);
+$pdf->Cell(0, 6, $_SESSION['nama_pengguna'], 0, 1, 'R');
 
-// Info cetak
 $pdf->Ln(5);
+
 $pdf->SetFont('Arial', '', 9);
-$pdf->Cell(0, 5, 'Dicetak pada: ' . date('d-m-Y H:i:s') . ' oleh ' . $_SESSION['nama_pengguna'], 0, 1, 'R');
+$pdf->Cell(
+    0,
+    6,
+    'Dicetak pada: ' . date('d-m-Y H:i:s') . ' oleh ' . $_SESSION['nama_pengguna'],
+    0,
+    1,
+    'R'
+);
+
+// =======================
 // OUTPUT
 // =======================
 $pdf->Output('I', 'Laporan_Nilai_Aset.pdf');

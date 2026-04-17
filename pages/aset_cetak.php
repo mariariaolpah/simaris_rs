@@ -24,32 +24,32 @@ $result = mysqli_query($koneksi, $sql);
 $pdf = new FPDF('L', 'mm', 'A4');
 $pdf->AddPage();
 
-// ---------- Kop surat ----------
+/* ================= KOP SURAT ================= */
 $y = 8;
 $logoLeft  = realpath(__DIR__ . '/../assets/img/logo_dokpol.png');
 $logoRight = realpath(__DIR__ . '/../assets/img/logo_rs.jpg');
 
-$pdf->Image($logoLeft, 15, $y, 22);
-$pdf->Image($logoRight, 260, $y, 22);
+if (file_exists($logoLeft)) $pdf->Image($logoLeft, 15, $y, 22);
+if (file_exists($logoRight)) $pdf->Image($logoRight, 260, $y, 22);
 
 $pdf->SetFont('Arial', 'B', 15);
 $pdf->SetXY(0, $y + 2);
 $pdf->Cell(0, 10, 'RUMKIT BHAYANGKARA TK. III BANJARMASIN', 0, 1, 'C');
+
 $pdf->SetFont('Arial', '', 11);
 $pdf->Cell(0, 5, 'Jl. A. Yani Km. 3,5 Banjarmasin 70235', 0, 1, 'C');
 $pdf->Ln(15);
 
-// ---------- Judul Laporan ----------
+/* ================= JUDUL ================= */
 $pdf->SetFont('Arial', 'B', 14);
 $pdf->Cell(0, 10, 'LAPORAN DATA ASET & INFRASTRUKTUR', 0, 1, 'C');
 $pdf->Ln(5);
 
-// ---------- Header Tabel (Ukuran Kolom di-Presisi agar Pas) ----------
+/* ================= HEADER TABEL ================= */
 $pdf->SetFont('Arial', 'B', 10);
-$pdf->SetFillColor(52, 152, 219);
+$pdf->SetFillColor(72, 201, 176);
 $pdf->SetTextColor(255);
 
-// Pengaturan Lebar Kolom agar pas di A4 Landscape (Total 275mm)
 $w = [10, 45, 30, 35, 40, 25, 30, 35, 25];
 
 $pdf->SetX(11);
@@ -63,9 +63,10 @@ $pdf->Cell($w[6], 10, 'Asal-Usul', 1, 0, 'C', true);
 $pdf->Cell($w[7], 10, 'Harga (Rp)', 1, 0, 'C', true);
 $pdf->Cell($w[8], 10, 'Tgl Masuk', 1, 1, 'C', true);
 
-// ---------- Isi Tabel ----------
+/* ================= ISI ================= */
 $pdf->SetFont('Arial', '', 9);
 $pdf->SetTextColor(0);
+
 $i = 1;
 while ($row = mysqli_fetch_assoc($result)) {
     $pdf->SetX(11);
@@ -80,4 +81,30 @@ while ($row = mysqli_fetch_assoc($result)) {
     $pdf->Cell($w[8], 8, date('d/m/Y', strtotime($row['tanggal_masuk'])), 1, 1, 'C');
 }
 
+/* ================= FOOTER TTD (BARU) ================= */
+$pdf->Ln(10);
+
+$pdf->SetFont('Arial', '', 10);
+$pdf->Cell(0, 5, 'Banjarmasin, ' . date('d F Y'), 0, 1, 'R');
+$pdf->Cell(0, 5, 'Mengetahui,', 0, 1, 'R');
+$pdf->Cell(0, 5, 'Administrator', 0, 1, 'R');
+
+$pdf->Ln(10);
+
+$pdf->SetFont('Arial', 'B', 10);
+$pdf->Cell(0, 5, $_SESSION['nama_pengguna'], 0, 1, 'R');
+
+$pdf->Ln(5);
+
+$pdf->SetFont('Arial', 'I', 9);
+$pdf->Cell(
+    0,
+    5,
+    'Dicetak pada: ' . date('d-m-Y H:i:s') . ' oleh ' . $_SESSION['nama_pengguna'],
+    0,
+    1,
+    'R'
+);
+
 $pdf->Output();
+exit;
