@@ -152,7 +152,7 @@ while ($row = mysqli_fetch_assoc($query)) {
                             </a>
 
                             <a href="audit_cetak.php" class="btn btn-light btn-sm">
-                                Cetak
+                                Cetak PDF
                             </a>
 
                         </div>

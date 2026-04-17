@@ -7,16 +7,53 @@ if (!isset($_SESSION['id_pengguna'])) {
 
 include(__DIR__ . '/../config/koneksi.php');
 
-// Search
-$search = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
 
-$sql = "SELECT * FROM perawatan";
+// ================= PAGINATION ================= //
+$limit = 8;
+
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+
+$offset = ($page - 1) * $limit;
+
+// SEARCH
+$search = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $search = $_GET['search']) : "";
+
+// QUERY DATA
 if ($search != '') {
-    $sql .= " WHERE nama_aset LIKE '%$search%' OR teknisi LIKE '%$search%' OR status LIKE '%$search%'";
-}
-$sql .= " ORDER BY id DESC";
 
-$result = mysqli_query($koneksi, $sql);
+    $query = mysqli_query($koneksi, "SELECT * FROM perawatan 
+        WHERE nama_aset LIKE '%$search%' 
+        OR teknisi LIKE '%$search%' 
+        OR status LIKE '%$search%'
+        ORDER BY id DESC
+        LIMIT $limit OFFSET $offset
+    ");
+
+    $count = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM perawatan 
+        WHERE nama_aset LIKE '%$search%' 
+        OR teknisi LIKE '%$search%' 
+        OR status LIKE '%$search%'
+    ");
+} else {
+
+    $query = mysqli_query($koneksi, "SELECT * FROM perawatan 
+        ORDER BY id DESC
+        LIMIT $limit OFFSET $offset
+    ");
+
+    $count = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM perawatan");
+}
+
+$total_row = mysqli_fetch_assoc($count);
+$total_data = $total_row['total'];
+$total_page = ceil($total_data / $limit);
+
+// DATA ARRAY
+$perawatan_list = [];
+while ($row = mysqli_fetch_assoc($query)) {
+    $perawatan_list[] = $row;
+}
 ?>
 
 <!DOCTYPE html>
@@ -24,9 +61,10 @@ $result = mysqli_query($koneksi, $sql);
 
 <head>
     <meta charset="UTF-8">
-    <title>Perawatan / Pemeliharaan | SIMARIS RS Bhayangkara</title>
+    <title>Perawatan | SIMARIS RS Bhayangkara</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
     <style>
         body {
             font-family: 'Poppins', sans-serif;
@@ -39,46 +77,9 @@ $result = mysqli_query($koneksi, $sql);
             min-height: 100vh;
         }
 
-        #sidebar-wrapper {
-            width: 220px;
-            background: linear-gradient(180deg, #2c7a7b, #1cc88a);
-            color: #fff;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .sidebar-heading {
-            padding: 1.5rem 1rem;
-            font-size: 1.2rem;
-            font-weight: 700;
-            text-align: center;
-            border-bottom: 1px solid rgba(255, 255, 255, .3);
-        }
-
-        .list-group-item {
-            background: transparent;
-            color: #fff;
-            border: none;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, .1);
-            cursor: pointer;
-        }
-
-        .list-group-item:hover {
-            background-color: rgba(255, 255, 255, .15);
-        }
-
-        .list-group-item.active {
-            background-color: rgba(255, 255, 255, .25);
-            font-weight: bold;
-        }
-
         #page-content-wrapper {
             flex: 1;
-            padding: 0;
+            width: 100%;
         }
 
         .dashboard-header {
@@ -88,20 +89,6 @@ $result = mysqli_query($koneksi, $sql);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 3px solid #fff;
-        }
-
-        .dashboard-header h3 {
-            margin: 0;
-            font-weight: 700;
-        }
-
-        .admin-info {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 600;
-            font-size: 1rem;
         }
 
         .content {
@@ -117,14 +104,6 @@ $result = mysqli_query($koneksi, $sql);
             align-items: center;
         }
 
-        table.table-bordered {
-            border: 1px solid #d1f0eb;
-        }
-
-        table.table-hover tbody tr:hover {
-            background-color: #d1f0eb;
-        }
-
         table th,
         table td {
             vertical-align: middle !important;
@@ -135,79 +114,82 @@ $result = mysqli_query($koneksi, $sql);
             gap: 8px;
             justify-content: center;
         }
-
-        .btn-custom {
-            background-color: #ffffff;
-            color: #333;
-            font-weight: 600;
-            height: 38px;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            padding: 0 12px;
-        }
     </style>
 </head>
 
 <body>
+
     <div id="wrapper">
+
         <?php include(__DIR__ . '/../sidebar.php'); ?>
 
         <div id="page-content-wrapper">
+
             <div class="dashboard-header">
                 <h3>PERAWATAN / PEMELIHARAAN</h3>
-                <div class="admin-info">
+                <div>
                     <i class="bi bi-person-circle"></i>
-                    <span><?= $_SESSION['nama_pengguna']; ?> (<?= $_SESSION['level']; ?>)</span>
+                    <?= $_SESSION['nama_pengguna']; ?>
                 </div>
             </div>
 
             <div class="content">
+
                 <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>Data Perawatan / Pemeliharaan</span>
-                        <div class="d-flex gap-2 align-items-center">
-                            <!-- Form Pencarian -->
-                            <form method="GET" class="d-flex gap-2 mb-0">
-                                <input type="hidden" name="page" value="perawatan">
-                                <input type="text" name="search" class="form-control form-control-sm" placeholder="Cari perawatan..." value="<?= htmlspecialchars($search) ?>" style="height:38px; font-size:14px;">
-                                <button type="submit" class="btn btn-secondary" style="height:38px; font-size:14px;">
+
+                    <div class="card-header">
+
+                        <span>Data Perawatan</span>
+
+                        <div class="d-flex gap-2">
+
+                            <form method="GET" class="d-flex gap-2">
+                                <input type="text" name="search" class="form-control form-control-sm"
+                                    value="<?= htmlspecialchars($search) ?>"
+                                    placeholder="Cari...">
+                                <button class="btn btn-secondary btn-sm">
                                     <i class="bi bi-search"></i>
                                 </button>
                             </form>
 
-                            <!-- Tombol Tambah & Cetak -->
-                            <a href="perawatan_tambah.php" class="btn btn-custom">
-                                <i class="bi bi-plus-circle"></i> Tambah Perawatan
+                            <a href="perawatan_tambah.php" class="btn btn-light btn-sm">
+                                + Tambah
                             </a>
-                            <a href="perawatan_cetak.php<?= $search ? '?search=' . urlencode($search) : '' ?>" class="btn btn-custom">
-                                <i class="bi bi-printer"></i> Cetak PDF
+
+                            <a href="perawatan_cetak.php<?= $search ? '?search=' . urlencode($search) : '' ?>"
+                                class="btn btn-light btn-sm">
+                                Cetak PDF
                             </a>
+
                         </div>
+
                     </div>
 
-                    <div class="card-body">
-                        <table class="table table-bordered table-hover text-center align-middle">
+                    <div class="card-body table-responsive">
+
+                        <table class="table table-bordered table-hover text-center">
                             <thead class="table-light">
                                 <tr>
                                     <th>#</th>
                                     <th>Nama Aset</th>
                                     <th>Teknisi</th>
-                                    <th>Tanggal Perawatan</th>
+                                    <th>Tanggal</th>
                                     <th>Status</th>
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
+
                             <tbody>
-                                <?php if (mysqli_num_rows($result) == 0): ?>
+
+                                <?php if (empty($perawatan_list)): ?>
                                     <tr>
-                                        <td colspan="6">Belum ada data perawatan.</td>
+                                        <td colspan="6">Tidak ada data</td>
                                     </tr>
-                                    <?php else: $i = 1;
-                                    while ($p = mysqli_fetch_assoc($result)): ?>
+                                <?php else: ?>
+
+                                    <?php foreach ($perawatan_list as $i => $p): ?>
                                         <tr>
-                                            <td><?= $i++ ?></td>
+                                            <td><?= (($page - 1) * $limit) + $i + 1 ?></td>
                                             <td><?= htmlspecialchars($p['nama_aset']) ?></td>
                                             <td><?= htmlspecialchars($p['teknisi']) ?></td>
                                             <td><?= htmlspecialchars($p['tanggal']) ?></td>
@@ -215,26 +197,65 @@ $result = mysqli_query($koneksi, $sql);
                                                 <?php if ($p['status'] == 'Selesai'): ?>
                                                     <span class="badge bg-success">Selesai</span>
                                                 <?php elseif ($p['status'] == 'Sedang Proses'): ?>
-                                                    <span class="badge bg-warning text-dark">Sedang Proses</span>
+                                                    <span class="badge bg-warning text-dark">Proses</span>
                                                 <?php else: ?>
-                                                    <span class="badge bg-secondary">Belum Dimulai</span>
+                                                    <span class="badge bg-secondary">Belum</span>
                                                 <?php endif; ?>
                                             </td>
+
                                             <td class="btn-action">
-                                                <a href="perawatan_edit.php?id=<?= $p['id'] ?>" class="btn btn-warning btn-sm"><i class="bi bi-pencil-square"></i></a>
-                                                <a href="perawatan_hapus.php?id=<?= $p['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('Yakin ingin menghapus data ini?')"><i class="bi bi-trash"></i></a>
+                                                <a href="perawatan_edit.php?id=<?= $p['id'] ?>" class="btn btn-warning btn-sm">
+                                                    <i class="bi bi-pencil-square"></i>
+                                                </a>
+                                                <a href="perawatan_hapus.php?id=<?= $p['id'] ?>" class="btn btn-danger btn-sm">
+                                                    <i class="bi bi-trash"></i>
+                                                </a>
                                             </td>
                                         </tr>
-                                    <?php endwhile; ?>
+                                    <?php endforeach; ?>
+
                                 <?php endif; ?>
+
                             </tbody>
                         </table>
+
+                        <!-- PAGINATION kanan bawah -->
+                        <div class="d-flex justify-content-end mt-3">
+                            <nav>
+                                <ul class="pagination pagination-sm mb-0">
+
+                                    <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
+                                        <a class="page-link" href="?page=<?= $page - 1 ?>&search=<?= urlencode($search) ?>">
+                                            Prev
+                                        </a>
+                                    </li>
+
+                                    <li class="page-item disabled">
+                                        <span class="page-link">
+                                            <?= $page ?> / <?= $total_page ?>
+                                        </span>
+                                    </li>
+
+                                    <li class="page-item <?= ($page >= $total_page) ? 'disabled' : '' ?>">
+                                        <a class="page-link" href="?page=<?= $page + 1 ?>&search=<?= urlencode($search) ?>">
+                                            Next
+                                        </a>
+                                    </li>
+
+                                </ul>
+                            </nav>
+                        </div>
+
                     </div>
 
                 </div>
+
             </div>
+
         </div>
+
     </div>
+
 </body>
 
 </html>

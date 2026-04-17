@@ -148,7 +148,7 @@ while ($row = mysqli_fetch_assoc($query)) {
 
                             <a href="kerusakan_tambah.php" class="btn btn-light btn-sm">+ Tambah</a>
                             <a href="kerusakan_cetak.php<?= $search ? '?search=' . urlencode($search) : '' ?>"
-                                class="btn btn-light btn-sm">Cetak</a>
+                                class="btn btn-light btn-sm">Cetak PDF</a>
 
                         </div>
 
