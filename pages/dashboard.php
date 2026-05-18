@@ -443,6 +443,46 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
             </div>
         </div>
     </div>
+    <audio id="notifSound" src="../assets/notification.mp3" preload="auto"></audio>
+
+    <script>
+        window.addEventListener('DOMContentLoaded', (event) => {
+            // Ambil SEMUA baris di dalam tabel
+            const semuaBaris = document.querySelectorAll('.table-hover tbody tr');
+            let daftarAlat = [];
+
+            // 1. Kumpulkan data alat yang waktunya "Sisa" ATAU sudah "Terlewat"
+            semuaBaris.forEach(function(baris) {
+                if (baris.innerText.includes("Sisa") || baris.innerText.includes("Terlewat")) {
+                    // Merapikan spasi agar nama alat, tanggal, dan statusnya nyambung enak dibaca
+                    let teksBersih = baris.innerText.replace(/\s+/g, ' ').trim();
+                    daftarAlat.push("👉 " + teksBersih);
+                }
+            });
+
+            // 2. Jika ada alat terdeteksi (satu atau lebih), jalankan bunyi & tulisan
+            if (daftarAlat.length > 0) {
+                // A. Trigger putar suara notifikasi duluan
+                const putarSuara = document.getElementById('notifSound');
+                putarSuara.play().catch(function(e) {
+                    console.log("Browser menahan suara jika belum ada klik dari admin.");
+                });
+
+                // B. Tahan kotak tulisan selama 0.5 detik (500ms) agar suara berbunyi barengan
+                setTimeout(function() {
+                    let teksPeringatan = "⚠️ PENGINGAT KALIBRASI ALKES:\n\nSistem mendeteksi jadwal berikut:\n\n";
+
+                    // Menggabungkan SEMUA alat yang terdeteksi ke bawah (pakai enter / baris baru)
+                    teksPeringatan += daftarAlat.join("\n");
+
+                    teksPeringatan += "\n\nMohon segera tindak lanjuti agar operasional rumah sakit tidak terganggu!";
+
+                    alert(teksPeringatan);
+                }, 500);
+            }
+        });
+    </script>
+    </script>
 </body>
 
 </html>
