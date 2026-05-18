@@ -15,12 +15,16 @@ if (isset($_POST['simpan'])) {
     $nama_aset    = mysqli_real_escape_string($koneksi, $_POST['nama_aset']);
     $teknisi      = mysqli_real_escape_string($koneksi, $_POST['teknisi']);
     $tanggal      = mysqli_real_escape_string($koneksi, $_POST['tanggal']);
+
+    // Fitur Baru: Tanggal Kalibrasi Berikutnya
+    $tgl_kalibrasi = mysqli_real_escape_string($koneksi, $_POST['tanggal_kalibrasi_berikutnya']);
+
     $status       = mysqli_real_escape_string($koneksi, $_POST['status']);
 
     mysqli_query($koneksi, "INSERT INTO perawatan 
-        (id_kerusakan, nama_aset, teknisi, tanggal, status) 
+        (id_kerusakan, nama_aset, teknisi, tanggal, tanggal_kalibrasi_berikutnya, status) 
         VALUES 
-        ('$id_kerusakan','$nama_aset','$teknisi','$tanggal','$status')");
+        ('$id_kerusakan','$nama_aset','$teknisi','$tanggal','$tgl_kalibrasi','$status')");
 
     echo "<script>alert('Data perawatan berhasil ditambahkan');window.location='perawatan.php';</script>";
 }
@@ -70,7 +74,8 @@ if (isset($_POST['simpan'])) {
             gap: 10px;
         }
 
-        .form-control {
+        .form-control,
+        .form-select {
             border-radius: 10px;
             padding: 10px 12px;
         }
@@ -102,7 +107,6 @@ if (isset($_POST['simpan'])) {
             <div class="card-body">
                 <form method="post">
 
-                    <!-- PILIH KERUSAKAN -->
                     <div class="mb-3">
                         <label class="form-label">Pilih Data Kerusakan</label>
                         <select name="id_kerusakan" class="form-select" required>
@@ -115,25 +119,27 @@ if (isset($_POST['simpan'])) {
                         </select>
                     </div>
 
-                    <!-- NAMA ASET -->
                     <div class="mb-3">
                         <label class="form-label">Nama Aset</label>
                         <input type="text" name="nama_aset" class="form-control" placeholder="Masukkan nama aset" required>
                     </div>
 
-                    <!-- TEKNISI -->
                     <div class="mb-3">
                         <label class="form-label">Teknisi</label>
                         <input type="text" name="teknisi" class="form-control" placeholder="Nama teknisi" required>
                     </div>
 
-                    <!-- TANGGAL -->
                     <div class="mb-3">
-                        <label class="form-label">Tanggal Perawatan</label>
+                        <label class="form-label">Tanggal Perawatan Saat Ini</label>
                         <input type="date" name="tanggal" class="form-control" value="<?= date('Y-m-d') ?>" required>
                     </div>
 
-                    <!-- STATUS -->
+                    <div class="mb-3">
+                        <label class="form-label text-danger fw-bold">Tanggal Kalibrasi/Maintenance Berikutnya</label>
+                        <input type="date" name="tanggal_kalibrasi_berikutnya" class="form-control" required>
+                        <small class="text-muted">Penting untuk alat medis agar jadwalnya tidak terlewat.</small>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label">Status</label>
                         <select name="status" class="form-select" required>

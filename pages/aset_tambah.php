@@ -7,194 +7,202 @@ if (!isset($_SESSION['id_pengguna'])) {
 
 include(__DIR__ . '/../config/koneksi.php');
 
-// Ambil daftar lokasi dari master lokasi
-$lokasi_list = [];
-$lokasi_query = mysqli_query($koneksi, "SELECT * FROM lokasi_aset ORDER BY nama_lokasi ASC");
-while ($row = mysqli_fetch_assoc($lokasi_query)) {
-    $lokasi_list[] = $row;
-}
-
 if (isset($_POST['simpan'])) {
-    $nama = mysqli_real_escape_string($koneksi, $_POST['nama_aset']);
+    $nama_aset = mysqli_real_escape_string($koneksi, $_POST['nama_aset']);
+    $kategori_aset = mysqli_real_escape_string($koneksi, $_POST['kategori_aset']);
     $jenis = mysqli_real_escape_string($koneksi, $_POST['jenis']);
-    $tipe  = mysqli_real_escape_string($koneksi, $_POST['tipe_aset']);
+    $tipe_aset = mysqli_real_escape_string($koneksi, $_POST['tipe_aset']);
     $lokasi = mysqli_real_escape_string($koneksi, $_POST['lokasi']);
     $kondisi = mysqli_real_escape_string($koneksi, $_POST['kondisi']);
-    $tanggal = $_POST['tanggal_masuk'];
-
-    // Fitur Tambahan Skripsi
     $asal_usul = mysqli_real_escape_string($koneksi, $_POST['asal_usul']);
-    $harga = mysqli_real_escape_string($koneksi, $_POST['harga']);
+    $harga = (int)$_POST['harga'];
+    $umur_ekonomis = (int)$_POST['umur_ekonomis'];
+    $tanggal_masuk = mysqli_real_escape_string($koneksi, $_POST['tanggal_masuk']);
 
-    // --- REVISI FITUR UPLOAD DOKUMEN ---
-    $nama_file = $_FILES['dokumen_aset']['name'];
-    $tmp_file = $_FILES['dokumen_aset']['tmp_name'];
-
-    // Tentukan folder penyimpanan file (pastikan folder ini sudah Anda buat)
-    $folder_simpan = "../assets/dokumen/";
-
-    if (!empty($nama_file)) {
-        // Buat nama file unik agar tidak bentrok jika namanya sama
-        $nama_file_baru = time() . '_' . $nama_file;
-        $path = $folder_simpan . $nama_file_baru;
-
-        // Pindahkan file ke folder tujuan
-        move_uploaded_file($tmp_file, $path);
-
-        // Simpan ke database beserta nama filenya
-        mysqli_query($koneksi, "INSERT INTO aset (nama_aset, jenis, tipe_aset, lokasi, kondisi, asal_usul, harga, tanggal_masuk, dokumen)
-                                VALUES ('$nama', '$jenis', '$tipe', '$lokasi', '$kondisi', '$asal_usul', '$harga', '$tanggal', '$nama_file_baru')");
-    } else {
-        // Jika petugas tidak mengunggah file, simpan tanpa kolom dokumen
-        mysqli_query($koneksi, "INSERT INTO aset (nama_aset, jenis, tipe_aset, lokasi, kondisi, asal_usul, harga, tanggal_masuk)
-                                VALUES ('$nama', '$jenis', '$tipe', '$lokasi', '$kondisi', '$asal_usul', '$harga', '$tanggal')");
+    // Upload Dokumen (Opsional)
+    $dokumen = "";
+    if (isset($_FILES['dokumen']) && $_FILES['dokumen']['error'] == 0) {
+        $file_name = time() . '_' . $_FILES['dokumen']['name'];
+        $tmp_name = $_FILES['dokumen']['tmp_name'];
+        $folder = __DIR__ . '/../assets/dokumen/';
+        if (!file_exists($folder)) {
+            mkdir($folder, 0777, true);
+        }
+        move_uploaded_file($tmp_name, $folder . $file_name);
+        $dokumen = $file_name;
     }
 
-    echo "<script>alert('Aset berhasil ditambahkan');window.location='aset.php';</script>";
+    $query = "INSERT INTO aset (nama_aset, kategori_aset, jenis, tipe_aset, lokasi, kondisi, asal_usul, harga, umur_ekonomis, tanggal_masuk, dokumen) 
+              VALUES ('$nama_aset', '$kategori_aset', '$jenis', '$tipe_aset', '$lokasi', '$kondisi', '$asal_usul', '$harga', '$umur_ekonomis', '$tanggal_masuk', '$dokumen')";
+
+    if (mysqli_query($koneksi, $query)) {
+        echo "<script>alert('Data aset berhasil ditambahkan!'); window.location='aset.php';</script>";
+    } else {
+        echo "<script>alert('Gagal menambahkan data!');</script>";
+    }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="id">
 
 <head>
     <meta charset="UTF-8">
-    <title>Tambah Aset | SIMARIS RS Bhayangkara</title>
+    <title>Tambah Aset | SIMARIS RS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Poppins', sans-serif;
-            background: linear-gradient(135deg, #f0fdfa, #ccfbf1);
-            min-height: 100vh;
+            background-color: #f4f6f9;
+            color: #333;
+        }
+
+        #wrapper {
             display: flex;
-            justify-content: center;
+            min-height: 100vh;
+        }
+
+        #page-content-wrapper {
+            flex: 1;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+        .dashboard-header {
+            background: linear-gradient(90deg, #2c7a7b, #1cc88a);
+            color: #fff;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
             align-items: center;
-            padding: 20px 0;
-            /* Tambahan padding agar form tidak terpotong di layar kecil */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
         }
 
-        .container-form {
-            width: 420px;
-            max-width: 90%;
-        }
-
-        .form-control,
-        .form-select {
-            height: 42px;
-            font-size: 0.9rem;
-            border-radius: 8px;
+        .content {
+            padding: 30px;
         }
 
         .card {
             border: none;
             border-radius: 12px;
-            box-shadow: 0 5px 16px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
 
         .card-header {
             background: linear-gradient(90deg, #2c7a7b, #1cc88a);
             color: #fff;
             font-weight: 600;
-            font-size: 1.15rem;
-            border-top-left-radius: 12px;
-            border-top-right-radius: 12px;
-            padding: 14px 18px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            padding: 15px 20px;
+            border-top-left-radius: 12px !important;
+            border-top-right-radius: 12px !important;
+        }
+
+        .form-label {
+            font-weight: 500;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+
+        .form-control,
+        .form-select {
+            border-radius: 8px;
+            padding: 10px 14px;
         }
     </style>
-
 </head>
 
 <body>
-
-    <div class="container-form">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-plus-circle"></i> Tambah Aset / Infrastruktur
+    <div id="wrapper">
+        <?php include(__DIR__ . '/../sidebar.php'); ?>
+        <div id="page-content-wrapper">
+            <div class="dashboard-header">
+                <h4 class="fw-bold m-0"><i class="bi bi-plus-circle"></i> TAMBAH ASET BARU</h4>
             </div>
-            <div class="card-body">
-                <form method="post" enctype="multipart/form-data">
+            <div class="content">
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-file-earmark-plus"></i> Form Input Data Aset</div>
+                    <div class="card-body p-4">
+                        <form method="POST" enctype="multipart/form-data">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Nama Aset / Alat</label>
+                                    <input type="text" name="nama_aset" class="form-control" required placeholder="Contoh: Mesin EKG">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Kategori</label>
+                                    <select name="kategori_aset" class="form-select" required>
+                                        <option value="">-- Pilih Kategori --</option>
+                                        <option value="Medis">Medis (Alat Kesehatan)</option>
+                                        <option value="Non-Medis">Non-Medis (Infrastruktur Umum)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Jenis Aset</label>
+                                    <input type="text" name="jenis" class="form-control" required placeholder="Contoh: Alat Diagnostik">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Tipe / Merek / Spesifikasi</label>
+                                    <input type="text" name="tipe_aset" class="form-control" required placeholder="Contoh: Philips PageWriter TC20">
+                                </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Nama Aset</label>
-                        <input type="text" name="nama_aset" class="form-control" required>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Lokasi Ruangan</label>
+                                    <select name="lokasi" class="form-select" required>
+                                        <option value="">-- Pilih Ruangan --</option>
+                                        <?php
+                                        $q_lokasi = mysqli_query($koneksi, "SELECT * FROM lokasi_aset ORDER BY nama_lokasi ASC");
+                                        while ($lok = mysqli_fetch_assoc($q_lokasi)):
+                                        ?>
+                                            <option value="<?= htmlspecialchars($lok['nama_lokasi']) ?>"><?= htmlspecialchars($lok['nama_lokasi']) ?></option>
+                                        <?php endwhile; ?>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Kondisi</label>
+                                    <select name="kondisi" class="form-select" required>
+                                        <option value="Baik">Baik</option>
+                                        <option value="Perlu Perawatan">Perlu Perawatan</option>
+                                        <option value="Rusak">Rusak</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Asal Usul Perolehan</label>
+                                    <select name="asal_usul" class="form-select" required>
+                                        <option value="Pembelian">Pembelian (Dana RS)</option>
+                                        <option value="Hibah">Hibah / Bantuan</option>
+                                        <option value="Sewa">Sewa / Pinjam Pakai</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Harga Perolehan (Rp)</label>
+                                    <input type="number" name="harga" class="form-control" required placeholder="Contoh: 15000000">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Umur Ekonomis (Tahun)</label>
+                                    <input type="number" name="umur_ekonomis" class="form-control" required placeholder="Contoh: 5">
+                                </div>
+                                <div class="col-md-6 mb-4">
+                                    <label class="form-label">Tanggal Masuk / Pembelian</label>
+                                    <input type="date" name="tanggal_masuk" class="form-control" required>
+                                </div>
+                                <div class="col-md-6 mb-4">
+                                    <label class="form-label">Upload Dokumen (Opsional - PDF/JPG)</label>
+                                    <input type="file" name="dokumen" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-end gap-2">
+                                <a href="aset.php" class="btn btn-secondary px-4">Batal</a>
+                                <button type="submit" name="simpan" class="btn btn-success px-4 fw-bold">Simpan Aset</button>
+                            </div>
+                        </form>
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Jenis</label>
-                        <input type="text" name="jenis" class="form-control" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Tipe Aset</label>
-                        <input type="text" name="tipe_aset" class="form-control">
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Lokasi</label>
-                        <select name="lokasi" class="form-control" required>
-                            <option value="">-- Pilih Lokasi --</option>
-                            <?php foreach ($lokasi_list as $lok) { ?>
-                                <option value="<?= $lok['nama_lokasi'] ?>">
-                                    <?= $lok['nama_lokasi'] ?>
-                                </option>
-                            <?php } ?>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Kondisi</label>
-                        <select name="kondisi" class="form-select" required>
-                            <option value="">-- Pilih Kondisi --</option>
-                            <option value="Baik">Baik</option>
-                            <option value="Perlu Perawatan">Perlu Perawatan</option>
-                            <option value="Rusak">Rusak</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Asal-Usul Barang</label>
-                        <select name="asal_usul" class="form-select" required>
-                            <option value="">-- Pilih Asal-Usul --</option>
-                            <option value="Pembelian">Pembelian / Anggaran RS</option>
-                            <option value="Hibah">Hibah / Bantuan</option>
-                            <option value="Sewa">Sewa</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Harga Perolehan / Nilai Aset (Rp)</label>
-                        <input type="number" name="harga" class="form-control" placeholder="Contoh: 5000000" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Tanggal Masuk</label>
-                        <input type="date" name="tanggal_masuk" class="form-control" value="<?= date('Y-m-d') ?>" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Upload Foto / Dokumen (JPG/PDF)</label>
-                        <input type="file" name="dokumen_aset" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
-                        <small class="text-muted">Opsional: Format JPG/PNG/PDF</small>
-                    </div>
-
-                    <div class="d-flex justify-content-end gap-2 mt-4">
-                        <button type="submit" name="simpan" class="btn btn-success px-4">
-                            <i class="bi bi-save"></i> Simpan
-                        </button>
-                        <a href="aset.php" class="btn btn-secondary px-4">
-                            <i class="bi bi-x-circle"></i> Batal
-                        </a>
-                    </div>
-
-                </form>
+                </div>
             </div>
         </div>
     </div>
-
 </body>
 
 </html>

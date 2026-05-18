@@ -7,6 +7,14 @@ if (!isset($_SESSION['id_pengguna'])) {
 
 include(__DIR__ . '/../config/koneksi.php');
 
+// ================= FORMAT TANGGAL =================
+function formatTanggal($tanggal)
+{
+    if (!$tanggal || $tanggal == '0000-00-00') {
+        return '-';
+    }
+    return date('d-m-Y', strtotime($tanggal));
+}
 
 // ================= PAGINATION ================= //
 $limit = 8;
@@ -21,7 +29,6 @@ $search = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $search =
 
 // QUERY DATA
 if ($search != '') {
-
     $query = mysqli_query($koneksi, "SELECT * FROM perawatan 
         WHERE nama_aset LIKE '%$search%' 
         OR teknisi LIKE '%$search%' 
@@ -36,7 +43,6 @@ if ($search != '') {
         OR status LIKE '%$search%'
     ");
 } else {
-
     $query = mysqli_query($koneksi, "SELECT * FROM perawatan 
         ORDER BY id DESC
         LIMIT $limit OFFSET $offset
@@ -114,6 +120,17 @@ while ($row = mysqli_fetch_assoc($query)) {
             gap: 8px;
             justify-content: center;
         }
+
+        /* Animasi kedip untuk peringatan kalibrasi */
+        .anim-blink {
+            animation: blinker 1.5s linear infinite;
+        }
+
+        @keyframes blinker {
+            50% {
+                opacity: 0.3;
+            }
+        }
     </style>
 </head>
 
@@ -139,7 +156,7 @@ while ($row = mysqli_fetch_assoc($query)) {
 
                     <div class="card-header">
 
-                        <span>Data Perawatan</span>
+                        <span>Data Perawatan & Jadwal Kalibrasi</span>
 
                         <div class="d-flex gap-2">
 
@@ -173,7 +190,10 @@ while ($row = mysqli_fetch_assoc($query)) {
                                     <th>#</th>
                                     <th>Nama Aset</th>
                                     <th>Teknisi</th>
-                                    <th>Tanggal</th>
+                                    <th>Tgl Perawatan</th>
+
+                                    <th>Jadwal Kalibrasi Berikutnya</th>
+
                                     <th>Status</th>
                                     <th>Aksi</th>
                                 </tr>
@@ -183,16 +203,41 @@ while ($row = mysqli_fetch_assoc($query)) {
 
                                 <?php if (empty($perawatan_list)): ?>
                                     <tr>
-                                        <td colspan="6">Tidak ada data</td>
+                                        <td colspan="7">Tidak ada data</td>
                                     </tr>
                                 <?php else: ?>
 
                                     <?php foreach ($perawatan_list as $i => $p): ?>
                                         <tr>
                                             <td><?= (($page - 1) * $limit) + $i + 1 ?></td>
-                                            <td><?= htmlspecialchars($p['nama_aset']) ?></td>
+                                            <td class="fw-bold"><?= htmlspecialchars($p['nama_aset']) ?></td>
                                             <td><?= htmlspecialchars($p['teknisi']) ?></td>
-                                            <td><?= htmlspecialchars($p['tanggal']) ?></td>
+                                            <td><?= formatTanggal($p['tanggal']) ?></td>
+
+                                            <td>
+                                                <?php
+                                                $tgl_berikutnya = $p['tanggal_kalibrasi_berikutnya'];
+                                                if ($tgl_berikutnya && $tgl_berikutnya != '0000-00-00') {
+                                                    echo "<span class='fw-bold'>" . formatTanggal($tgl_berikutnya) . "</span><br>";
+
+                                                    // Hitung selisih hari dari hari ini
+                                                    $selisih_detik = strtotime($tgl_berikutnya) - time();
+                                                    $selisih_hari = floor($selisih_detik / (60 * 60 * 24));
+
+                                                    if ($selisih_hari <= 7 && $selisih_hari >= 0) {
+                                                        echo "<span class='badge bg-warning text-dark mt-1 anim-blink'><i class='bi bi-exclamation-triangle'></i> H-$selisih_hari Kalibrasi!</span>";
+                                                    } elseif ($selisih_hari < 0) {
+                                                        $lewat = abs($selisih_hari);
+                                                        echo "<span class='badge bg-danger mt-1 anim-blink'><i class='bi bi-x-circle'></i> Terlewat $lewat Hari!</span>";
+                                                    } else {
+                                                        echo "<span class='badge bg-success mt-1'>Aman</span>";
+                                                    }
+                                                } else {
+                                                    echo "-";
+                                                }
+                                                ?>
+                                            </td>
+
                                             <td>
                                                 <?php if ($p['status'] == 'Selesai'): ?>
                                                     <span class="badge bg-success">Selesai</span>
@@ -219,7 +264,6 @@ while ($row = mysqli_fetch_assoc($query)) {
                             </tbody>
                         </table>
 
-                        <!-- PAGINATION kanan bawah -->
                         <div class="d-flex justify-content-end mt-3">
                             <nav>
                                 <ul class="pagination pagination-sm mb-0">

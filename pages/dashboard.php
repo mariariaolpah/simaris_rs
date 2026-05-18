@@ -102,8 +102,25 @@ $perawatan_selesai = mysqli_fetch_array(mysqli_query($koneksi, "
     WHERE status='Selesai'
 "))['t'];
 
-$perawatan_terbaru = mysqli_query($koneksi, "SELECT * FROM perawatan ORDER BY tanggal DESC LIMIT 5");
-$no = 1;
+// --- TAMBAHAN BARU: DATA KATEGORI & KALIBRASI ---
+// Hitung Kategori Aset untuk Grafik
+$q_kategori = mysqli_query($koneksi, "SELECT kategori_aset, COUNT(*) as jumlah FROM aset GROUP BY kategori_aset");
+$jml_medis = 0;
+$jml_nonmedis = 0;
+$jml_lainnya = 0;
+while ($row = mysqli_fetch_assoc($q_kategori)) {
+    if ($row['kategori_aset'] == 'Medis') $jml_medis = $row['jumlah'];
+    elseif ($row['kategori_aset'] == 'Non-Medis') $jml_nonmedis = $row['jumlah'];
+    else $jml_lainnya += $row['jumlah'];
+}
+
+// Ambil Data Kalibrasi Mendesak (H-7)
+$q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berikutnya, status 
+                                       FROM perawatan 
+                                       WHERE tanggal_kalibrasi_berikutnya IS NOT NULL 
+                                       AND tanggal_kalibrasi_berikutnya > '2000-01-01'
+                                       AND DATEDIFF(tanggal_kalibrasi_berikutnya, CURDATE()) <= 7
+                                       ORDER BY tanggal_kalibrasi_berikutnya ASC LIMIT 5");
 ?>
 
 <!DOCTYPE html>
@@ -127,45 +144,10 @@ $no = 1;
             min-height: 100vh;
         }
 
-        #sidebar-wrapper {
-            width: 220px;
-            background: linear-gradient(180deg, #2c7a7b, #1cc88a);
-            color: #fff;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .sidebar-heading {
-            padding: 1.5rem 1rem;
-            font-size: 1.2rem;
-            font-weight: 700;
-            text-align: center;
-            border-bottom: 1px solid rgba(255, 255, 255, .3);
-        }
-
-        .list-group-item {
-            background: transparent;
-            color: #fff;
-            border: none;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, .1);
-        }
-
-        .list-group-item:hover {
-            background-color: rgba(255, 255, 255, .15);
-        }
-
-        .list-group-item.active {
-            background-color: rgba(255, 255, 255, .25);
-            font-weight: bold;
-        }
-
         #page-content-wrapper {
             flex: 1;
             padding: 0;
+            overflow-x: hidden;
         }
 
         .dashboard-header {
@@ -356,7 +338,64 @@ $no = 1;
                     </div>
                 </div>
 
+                <div class="row g-3 mt-2">
+                    <div class="col-md-5">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-header">Proporsi Kategori Aset</div>
+                            <div class="card-body d-flex justify-content-center align-items-center">
+                                <canvas id="kategoriChart" width="200" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-7">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-header bg-danger text-white border-0">
+                                <i class="bi bi-exclamation-triangle-fill"></i> Peringatan Kalibrasi (Mendesak)
+                            </div>
+                            <div class="card-body p-0">
+                                <table class="table table-hover mb-0 text-center align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Nama Aset</th>
+                                            <th>Jadwal Kalibrasi</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php if (mysqli_num_rows($q_kalibrasi) == 0): ?>
+                                            <tr>
+                                                <td colspan="3" class="py-4 text-success fw-bold">
+                                                    <i class="bi bi-check-circle"></i> Aman! Tidak ada kalibrasi mendesak.
+                                                </td>
+                                            </tr>
+                                        <?php else: ?>
+                                            <?php while ($kal = mysqli_fetch_assoc($q_kalibrasi)):
+                                                $selisih_detik = strtotime($kal['tanggal_kalibrasi_berikutnya']) - time();
+                                                $selisih_hari = floor($selisih_detik / (60 * 60 * 24));
+                                            ?>
+                                                <tr>
+                                                    <td class="text-start ps-3 fw-bold"><?= htmlspecialchars($kal['nama_aset']) ?></td>
+                                                    <td><?= date('d-m-Y', strtotime($kal['tanggal_kalibrasi_berikutnya'])) ?></td>
+                                                    <td>
+                                                        <?php if ($selisih_hari < 0): ?>
+                                                            <span class="badge bg-danger">Terlewat <?= abs($selisih_hari) ?> Hari</span>
+                                                        <?php else: ?>
+                                                            <span class="badge bg-warning text-dark">Sisa <?= $selisih_hari ?> Hari</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                </tr>
+                                            <?php endwhile; ?>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <script>
+                    // Grafik Kondisi Aset (Lama)
                     const ctx = document.getElementById('asetChart').getContext('2d');
                     new Chart(ctx, {
                         type: 'pie',
@@ -365,6 +404,28 @@ $no = 1;
                             datasets: [{
                                 data: [<?= $aset_baik ?>, <?= $aset_perawatan ?>, <?= $aset_rusak ?>],
                                 backgroundColor: ['#2c7a7b', '#58d8c5', '#e74c3c'],
+                                borderColor: '#fff',
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            plugins: {
+                                legend: {
+                                    position: 'bottom'
+                                }
+                            }
+                        }
+                    });
+
+                    // Grafik Kategori Aset (Baru)
+                    const ctxKat = document.getElementById('kategoriChart').getContext('2d');
+                    new Chart(ctxKat, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Medis (Alkes)', 'Non-Medis', 'Belum Diatur'],
+                            datasets: [{
+                                data: [<?= $jml_medis ?>, <?= $jml_nonmedis ?>, <?= $jml_lainnya ?>],
+                                backgroundColor: ['#e74c3c', '#3498db', '#95a5a6'],
                                 borderColor: '#fff',
                                 borderWidth: 2
                             }]

@@ -20,9 +20,13 @@ if (isset($_POST['update'])) {
     $nama_aset  = mysqli_real_escape_string($koneksi, $_POST['nama_aset']);
     $teknisi    = mysqli_real_escape_string($koneksi, $_POST['teknisi']);
     $tanggal    = mysqli_real_escape_string($koneksi, $_POST['tanggal']);
+
+    // Update Tanggal Kalibrasi
+    $tgl_kalibrasi = mysqli_real_escape_string($koneksi, $_POST['tanggal_kalibrasi_berikutnya']);
+
     $status     = mysqli_real_escape_string($koneksi, $_POST['status']);
 
-    mysqli_query($koneksi, "UPDATE perawatan SET nama_aset='$nama_aset', teknisi='$teknisi', tanggal='$tanggal', status='$status' WHERE id=$id");
+    mysqli_query($koneksi, "UPDATE perawatan SET nama_aset='$nama_aset', teknisi='$teknisi', tanggal='$tanggal', tanggal_kalibrasi_berikutnya='$tgl_kalibrasi', status='$status' WHERE id=$id");
     echo "<script>alert('Data perawatan berhasil diubah');window.location='perawatan.php';</script>";
 }
 ?>
@@ -112,9 +116,15 @@ if (isset($_POST['update'])) {
                         <input type="text" name="teknisi" class="form-control" value="<?= htmlspecialchars($p['teknisi']) ?>" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Tanggal Perawatan</label>
+                        <label class="form-label">Tanggal Perawatan Saat Ini</label>
                         <input type="date" name="tanggal" class="form-control" value="<?= htmlspecialchars($p['tanggal']) ?>" required>
                     </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-danger fw-bold">Tanggal Kalibrasi/Maintenance Berikutnya</label>
+                        <input type="date" name="tanggal_kalibrasi_berikutnya" class="form-control" value="<?= htmlspecialchars($p['tanggal_kalibrasi_berikutnya']) ?>" required>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label">Status</label>
                         <select name="status" class="form-select" required>
