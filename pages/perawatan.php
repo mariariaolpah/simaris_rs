@@ -174,7 +174,7 @@ while ($row = mysqli_fetch_assoc($query)) {
                             </a>
 
                             <a href="perawatan_cetak.php<?= $search ? '?search=' . urlencode($search) : '' ?>"
-                                class="btn btn-light btn-sm">
+                                class="btn btn-light btn-sm" target="_blank">
                                 Cetak PDF
                             </a>
 
@@ -191,9 +191,7 @@ while ($row = mysqli_fetch_assoc($query)) {
                                     <th>Nama Aset</th>
                                     <th>Teknisi</th>
                                     <th>Tgl Perawatan</th>
-
                                     <th>Jadwal Kalibrasi Berikutnya</th>
-
                                     <th>Status</th>
                                     <th>Aksi</th>
                                 </tr>
@@ -210,7 +208,7 @@ while ($row = mysqli_fetch_assoc($query)) {
                                     <?php foreach ($perawatan_list as $i => $p): ?>
                                         <tr>
                                             <td><?= (($page - 1) * $limit) + $i + 1 ?></td>
-                                            <td class="fw-bold"><?= htmlspecialchars($p['nama_aset']) ?></td>
+                                            <td class="text-start fw-bold"><?= htmlspecialchars($p['nama_aset']) ?></td>
                                             <td><?= htmlspecialchars($p['teknisi']) ?></td>
                                             <td><?= formatTanggal($p['tanggal']) ?></td>
 

@@ -39,33 +39,40 @@ $pdf->Ln(15);
 
 /* ================= JUDUL ================= */
 $pdf->SetFont('Arial', 'B', 16);
-$pdf->Cell(0, 10, 'DATA PERAWATAN ASET RS BHAYANGKARA', 0, 1, 'C');
+$pdf->Cell(0, 10, 'DATA PERAWATAN DAN KALIBRASI ASET', 0, 1, 'C');
 $pdf->Ln(5);
 
 /* ================= HEADER TABEL ================= */
 $pdf->SetFont('Arial', 'B', 11);
-$pdf->SetFillColor(72, 201, 176); // SAMAIN WARNA
+$pdf->SetFillColor(72, 201, 176); // SAMAIN WARNA HIJAU TOSCA
 $pdf->SetTextColor(255);
 
-$header = ['No', 'Nama Aset', 'Teknisi', 'Tanggal', 'Status'];
-$widths = [12, 95, 55, 75, 38];
+// Header diperbarui dengan Kalibrasi
+$header = ['No', 'Nama Aset', 'Teknisi', 'Tgl Perawatan', 'Jadwal Kalibrasi', 'Status'];
+// Lebar disesuaikan agar pas dengan A4 Landscape (~277mm)
+$widths = [10, 85, 45, 45, 45, 45];
 
 for ($i = 0; $i < count($header); $i++) {
     $pdf->Cell($widths[$i], 10, $header[$i], 1, 0, 'C', true);
 }
 $pdf->Ln();
 
-/* ================= ISI ================= */
+/* ================= ISI TABEL ================= */
 $pdf->SetFont('Arial', '', 10);
 $pdf->SetTextColor(0);
 
 $i = 1;
 while ($row = mysqli_fetch_assoc($query)) {
+    // Format Tanggal
+    $tgl_rawat = ($row['tanggal'] && $row['tanggal'] != '0000-00-00') ? date('d-m-Y', strtotime($row['tanggal'])) : '-';
+    $tgl_kalibrasi = ($row['tanggal_kalibrasi_berikutnya'] && $row['tanggal_kalibrasi_berikutnya'] != '0000-00-00') ? date('d-m-Y', strtotime($row['tanggal_kalibrasi_berikutnya'])) : '-';
+
     $pdf->Cell($widths[0], 8, $i++, 1, 0, 'C');
-    $pdf->Cell($widths[1], 8, $row['nama_aset'], 1);
-    $pdf->Cell($widths[2], 8, $row['teknisi'], 1);
-    $pdf->Cell($widths[3], 8, $row['tanggal'], 1);
-    $pdf->Cell($widths[4], 8, $row['status'], 1, 1);
+    $pdf->Cell($widths[1], 8, ' ' . $row['nama_aset'], 1, 0, 'L');
+    $pdf->Cell($widths[2], 8, ' ' . $row['teknisi'], 1, 0, 'L');
+    $pdf->Cell($widths[3], 8, $tgl_rawat, 1, 0, 'C');
+    $pdf->Cell($widths[4], 8, $tgl_kalibrasi, 1, 0, 'C');
+    $pdf->Cell($widths[5], 8, $row['status'], 1, 1, 'C');
 }
 
 /* ================= FOOTER ================= */
@@ -76,7 +83,7 @@ $pdf->Cell(0, 5, 'Banjarmasin, ' . date('d F Y'), 0, 1, 'R');
 $pdf->Cell(0, 5, 'Mengetahui,', 0, 1, 'R');
 $pdf->Cell(0, 5, 'Administrator', 0, 1, 'R');
 
-$pdf->Ln(10);
+$pdf->Ln(15);
 
 $pdf->SetFont('Arial', 'B', 10);
 $pdf->Cell(0, 5, $_SESSION['nama_pengguna'], 0, 1, 'R');

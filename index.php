@@ -338,7 +338,7 @@
 
     <!-- FOOTER -->
     <footer>
-        © 2025 RS Bhayangkara. Semua hak dilindungi. | Created by <strong>Maria Olpah</strong>
+        © 2026 RS Bhayangkara. Semua hak dilindungi. | Created by <strong>Maria Olpah</strong>
     </footer>
 
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
