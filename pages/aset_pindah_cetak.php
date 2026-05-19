@@ -19,7 +19,7 @@ $sql = "SELECT r.*, a.nama_aset, a.kategori_aset
 
 $conditions = [];
 if ($search != '') {
-    $conditions[] = "(a.nama_aset LIKE '%$search%' OR r.lokasi_sebelumnya LIKE '%$search%' OR r.lokasi_baru LIKE '%$search%' OR r.keterangan LIKE '%$search%')";
+    $conditions[] = "(a.nama_aset LIKE '%$search%' OR r.lokasi_sebelumnya LIKE '%$search%' OR r.lokasi_baru LIKE '%$search%' OR r.keterangan LIKE '%$search%' OR r.penanggung_jawab LIKE '%$search%')";
 }
 if ($kategori != '') {
     $conditions[] = "a.kategori_aset = '$kategori'";
@@ -28,7 +28,7 @@ if ($kategori != '') {
 if (count($conditions) > 0) {
     $sql .= " WHERE " . implode(" AND ", $conditions);
 }
-$sql .= " ORDER BY r.id_riwayat DESC"; // Sesuai dengan urutan data terbaru
+$sql .= " ORDER BY r.id_riwayat DESC";
 
 $query = mysqli_query($koneksi, $sql);
 
@@ -36,7 +36,7 @@ $query = mysqli_query($koneksi, $sql);
 $pdf = new FPDF('L', 'mm', 'A4');
 $pdf->AddPage();
 
-/* ================= KOP SURAT (SENADA DENGAN PERAWATAN) ================= */
+/* ================= KOP SURAT ================= */
 $y = 8;
 $logoLeft  = realpath(__DIR__ . '/../assets/img/logo_dokpol.png');
 $logoRight = realpath(__DIR__ . '/../assets/img/logo_rs.jpg');
@@ -57,13 +57,14 @@ $pdf->SetFont('Arial', 'B', 15);
 $pdf->Cell(0, 10, 'LAPORAN MUTASI & PELACAKAN LOKASI ASET', 0, 1, 'C');
 $pdf->Ln(5);
 
-/* ================= HEADER TABEL (WARNA HIJAU TOSCA IDENTIK) ================= */
-$pdf->SetFont('Arial', 'B', 11);
-$pdf->SetFillColor(72, 201, 176); // Warna Tosca yang sama persis
+/* ================= HEADER TABEL (ADA KOLOM P.JAWAB) ================= */
+$pdf->SetFont('Arial', 'B', 10);
+$pdf->SetFillColor(72, 201, 176);
 $pdf->SetTextColor(255);
 
-$header = ['No', 'Tgl Pindah', 'Nama Aset', 'Kategori', 'Lokasi Awal', 'Lokasi Baru', 'Keterangan'];
-$widths = [12, 28, 65, 35, 42, 42, 53]; // Total lebar pas dengan A4 Landscape (277mm)
+// [UPDATE] Menambahkan kolom P. Jawab dan menyesuaikan lebar
+$header = ['No', 'Tanggal', 'Nama Aset', 'Kategori', 'P. Jawab', 'Lok. Awal', 'Lok. Baru', 'Keterangan'];
+$widths = [10, 22, 50, 25, 35, 35, 35, 65]; // Total 277mm (Maksimal Landscape A4)
 
 for ($i = 0; $i < count($header); $i++) {
     $pdf->Cell($widths[$i], 10, $header[$i], 1, 0, 'C', true);
@@ -71,7 +72,7 @@ for ($i = 0; $i < count($header); $i++) {
 $pdf->Ln();
 
 /* ================= ISI DATA TABEL ================= */
-$pdf->SetFont('Arial', '', 10);
+$pdf->SetFont('Arial', '', 9);
 $pdf->SetTextColor(0);
 
 $i = 1;
@@ -80,26 +81,30 @@ if (mysqli_num_rows($query) == 0) {
 } else {
     while ($row = mysqli_fetch_assoc($query)) {
         $tgl_pindah = ($row['tanggal_pindah'] && $row['tanggal_pindah'] != '0000-00-00') ? date('d-m-Y', strtotime($row['tanggal_pindah'])) : '-';
-        $kat_aset = ($row['kategori_aset'] == 'Medis') ? 'Medis (Alkes)' : 'Non-Medis';
+        $kat_aset = ($row['kategori_aset'] == 'Medis') ? 'Medis' : 'Non-Medis';
+        // [UPDATE] Ambil penanggung jawab
+        $p_jawab = isset($row['penanggung_jawab']) ? $row['penanggung_jawab'] : '-';
 
+        // Memotong teks jika terlalu panjang agar muat di kolom PDF
         $pdf->Cell($widths[0], 9, $i++, 1, 0, 'C');
         $pdf->Cell($widths[1], 9, $tgl_pindah, 1, 0, 'C');
-        $pdf->Cell($widths[2], 9, ' ' . $row['nama_aset'], 1, 0, 'L');
+        $pdf->Cell($widths[2], 9, ' ' . substr($row['nama_aset'], 0, 25), 1, 0, 'L');
         $pdf->Cell($widths[3], 9, ' ' . $kat_aset, 1, 0, 'C');
-        $pdf->Cell($widths[4], 9, ' ' . $row['lokasi_sebelumnya'], 1, 0, 'L');
-        $pdf->Cell($widths[5], 9, ' ' . $row['lokasi_baru'], 1, 0, 'L');
-        $pdf->Cell($widths[6], 9, ' ' . $row['keterangan'], 1, 1, 'L');
+        $pdf->Cell($widths[4], 9, ' ' . substr($p_jawab, 0, 20), 1, 0, 'L');
+        $pdf->Cell($widths[5], 9, ' ' . substr($row['lokasi_sebelumnya'], 0, 18), 1, 0, 'L');
+        $pdf->Cell($widths[6], 9, ' ' . substr($row['lokasi_baru'], 0, 18), 1, 0, 'L');
+        $pdf->Cell($widths[7], 9, ' ' . substr($row['keterangan'], 0, 32), 1, 1, 'L');
     }
 }
 
-/* ================= FOOTER TANDA TANGAN (IDENTIK) ================= */
+/* ================= FOOTER TANDA TANGAN ================= */
 $pdf->Ln(10);
 $pdf->SetFont('Arial', '', 10);
 $pdf->Cell(0, 5, 'Banjarmasin, ' . date('d F Y'), 0, 1, 'R');
 $pdf->Cell(0, 5, 'Mengetahui,', 0, 1, 'R');
 $pdf->Cell(0, 5, 'Administrator', 0, 1, 'R');
 
-$pdf->Ln(15); // Ruang tanda tangan
+$pdf->Ln(15);
 
 $pdf->SetFont('Arial', 'B', 10);
 $pdf->Cell(0, 5, $_SESSION['nama_pengguna'], 0, 1, 'R');

@@ -13,6 +13,8 @@ if (isset($_POST['simpan_pindah'])) {
     $lokasi_baru = mysqli_real_escape_string($koneksi, $_POST['lokasi_baru']);
     $tanggal_pindah = mysqli_real_escape_string($koneksi, $_POST['tanggal_pindah']);
     $keterangan = mysqli_real_escape_string($koneksi, $_POST['keterangan']);
+    // [UPDATE] Mengambil nilai penanggung jawab dari form
+    $penanggung_jawab = mysqli_real_escape_string($koneksi, $_POST['penanggung_jawab']);
 
     // Ambil lokasi saat ini sebagai lokasi_sebelumnya
     $queryAset = mysqli_query($koneksi, "SELECT lokasi FROM aset WHERE id_aset = $id_aset");
@@ -22,9 +24,9 @@ if (isset($_POST['simpan_pindah'])) {
     if ($lokasi_sebelumnya == $lokasi_baru) {
         echo "<script>alert('Lokasi baru tidak boleh sama dengan lokasi saat ini!');window.location='aset_pindah.php';</script>";
     } else {
-        // 1. Masukkan ke tabel log riwayat_lokasi
-        $insert = mysqli_query($koneksi, "INSERT INTO riwayat_lokasi (id_aset, lokasi_sebelumnya, lokasi_baru, tanggal_pindah, keterangan) 
-                                VALUES ($id_aset, '$lokasi_sebelumnya', '$lokasi_baru', '$tanggal_pindah', '$keterangan')");
+        // 1. Masukkan ke tabel log riwayat_lokasi dengan kolom penanggung_jawab
+        $insert = mysqli_query($koneksi, "INSERT INTO riwayat_lokasi (id_aset, lokasi_sebelumnya, lokasi_baru, tanggal_pindah, keterangan, penanggung_jawab) 
+                                VALUES ($id_aset, '$lokasi_sebelumnya', '$lokasi_baru', '$tanggal_pindah', '$keterangan', '$penanggung_jawab')");
 
         // 2. Perbarui posisi ruangan terkini di tabel induk aset
         mysqli_query($koneksi, "UPDATE aset SET lokasi = '$lokasi_baru' WHERE id_aset = $id_aset");
@@ -48,7 +50,8 @@ $sql_riwayat = "SELECT r.*, a.nama_aset, a.kategori_aset
 
 $conditions = [];
 if ($search != '') {
-    $conditions[] = "(a.nama_aset LIKE '%$search%' OR r.lokasi_sebelumnya LIKE '%$search%' OR r.lokasi_baru LIKE '%$search%' OR r.keterangan LIKE '%$search%')";
+    // [UPDATE] Pencarian juga mencari nama penanggung jawab
+    $conditions[] = "(a.nama_aset LIKE '%$search%' OR r.lokasi_sebelumnya LIKE '%$search%' OR r.lokasi_baru LIKE '%$search%' OR r.keterangan LIKE '%$search%' OR r.penanggung_jawab LIKE '%$search%')";
 }
 if ($filter_kategori != '') {
     $conditions[] = "a.kategori_aset = '$filter_kategori'";
@@ -187,7 +190,6 @@ while ($row = mysqli_fetch_assoc($query_riwayat)) {
                                         <select name="lokasi_baru" class="form-select" required>
                                             <option value="">-- Pilih Ruangan Tujuan --</option>
                                             <?php
-                                            // Memanggil data master dari tabel lokasi_aset sama persis seperti di aset_tambah.php
                                             $q_lokasi = mysqli_query($koneksi, "SELECT * FROM lokasi_aset ORDER BY nama_lokasi ASC");
                                             while ($lok = mysqli_fetch_assoc($q_lokasi)):
                                             ?>
@@ -196,12 +198,17 @@ while ($row = mysqli_fetch_assoc($query_riwayat)) {
                                                 </option>
                                             <?php endwhile; ?>
                                         </select>
-                                        <small class="text-muted">Pilihan otomatis terhubung dengan master data lokasi RS.</small>
                                     </div>
 
                                     <div class="mb-3">
                                         <label class="form-label fw-semibold">Tanggal Pindah</label>
                                         <input type="date" name="tanggal_pindah" class="form-control" value="<?= date('Y-m-d') ?>" required>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold text-primary"><i class="bi bi-person-badge"></i> Penanggung Jawab</label>
+                                        <input type="text" name="penanggung_jawab" class="form-control" placeholder="Cth: Perawat Siti (UGD)" required>
+                                        <small class="text-muted">Nama peminta atau petugas yang memindahkan.</small>
                                     </div>
 
                                     <div class="mb-3">
@@ -228,7 +235,7 @@ while ($row = mysqli_fetch_assoc($query_riwayat)) {
                                     <div class="col-md-5">
                                         <label class="form-label small fw-bold text-secondary">Kata Kunci Pencarian</label>
                                         <div class="input-group input-group-sm">
-                                            <input type="text" name="search" class="form-control" value="<?= htmlspecialchars($search) ?>" placeholder="Cari nama aset atau ruangan...">
+                                            <input type="text" name="search" class="form-control" value="<?= htmlspecialchars($search) ?>" placeholder="Cari nama, P.Jawab, atau ruangan...">
                                         </div>
                                     </div>
                                     <div class="col-md-4">
@@ -255,41 +262,117 @@ while ($row = mysqli_fetch_assoc($query_riwayat)) {
 
                                 <div class="table-responsive">
                                     <table class="table table-hover border text-center align-middle">
+
                                         <thead>
                                             <tr>
-                                                <th style="width: 12%;">Tanggal</th>
-                                                <th style="width: 25%;">Nama Aset</th>
-                                                <th style="width: 15%;">Kategori</th>
-                                                <th style="width: 28%;">Pergerakan Ruang (Rute)</th>
+                                                <th style="width: 10%;">Tanggal</th>
+                                                <th style="width: 22%;">Nama Aset</th>
+                                                <th style="width: 15%;">P. Jawab</th>
+                                                <th style="width: 23%;">Pergerakan Ruang</th>
                                                 <th style="width: 20%;">Keterangan</th>
+                                                <th style="width: 10%;">Aksi</th>
                                             </tr>
                                         </thead>
+
                                         <tbody>
+
                                             <?php if (empty($riwayat_pindah)): ?>
+
                                                 <tr>
-                                                    <td colspan="5" class="text-muted py-4">Tidak ditemukan riwayat perpindahan lokasi aset yang sesuai.</td>
+                                                    <td colspan="6" class="text-muted py-4">
+                                                        Tidak ditemukan riwayat perpindahan lokasi aset yang sesuai.
+                                                    </td>
                                                 </tr>
+
                                             <?php else: ?>
+
                                                 <?php foreach ($riwayat_pindah as $r) : ?>
+
                                                     <tr>
-                                                        <td><small class="text-secondary"><?= date('d-m-Y', strtotime($r['tanggal_pindah'])) ?></small></td>
-                                                        <td class="fw-bold text-start text-dark"><?= htmlspecialchars($r['nama_aset']) ?></td>
+
                                                         <td>
-                                                            <?= ($r['kategori_aset'] == 'Medis') ? '<span class="badge bg-danger">Medis (Alkes)</span>' : '<span class="badge bg-primary">Non-Medis</span>' ?>
+                                                            <small class="text-secondary">
+                                                                <?= date('d-m-Y', strtotime($r['tanggal_pindah'])) ?>
+                                                            </small>
                                                         </td>
+
+                                                        <td class="fw-bold text-start text-dark">
+
+                                                            <?= htmlspecialchars($r['nama_aset']) ?>
+
+                                                            <br>
+
+                                                            <small class="<?= ($r['kategori_aset'] == 'Medis') ? 'text-danger' : 'text-primary' ?>">
+
+                                                                <?= ($r['kategori_aset'] == 'Medis') ? 'Medis (Alkes)' : 'Non-Medis' ?>
+
+                                                            </small>
+
+                                                        </td>
+
+                                                        <td class="fw-bold text-primary">
+
+                                                            <?= htmlspecialchars(isset($r['penanggung_jawab']) ? $r['penanggung_jawab'] : '-') ?>
+
+                                                        </td>
+
                                                         <td class="p-2 bg-light rounded shadow-sm">
-                                                            <span class="text-danger text-decoration-line-through small"><?= htmlspecialchars($r['lokasi_sebelumnya']) ?></span>
-                                                            <br> <i class="bi bi-arrow-down text-warning my-1 d-block fw-bold"></i>
-                                                            <span class="text-success fw-bold"><?= htmlspecialchars($r['lokasi_baru']) ?></span>
+
+                                                            <span class="text-danger text-decoration-line-through small">
+                                                                <?= htmlspecialchars($r['lokasi_sebelumnya']) ?>
+                                                            </span>
+
+                                                            <br>
+
+                                                            <i class="bi bi-arrow-down text-warning my-1 d-block fw-bold"></i>
+
+                                                            <span class="text-success fw-bold">
+                                                                <?= htmlspecialchars($r['lokasi_baru']) ?>
+                                                            </span>
+
                                                         </td>
-                                                        <td class="text-start small text-muted"><?= htmlspecialchars($r['keterangan']) ?></td>
+
+                                                        <td class="text-start small text-muted">
+
+                                                            <?= htmlspecialchars($r['keterangan']) ?>
+
+                                                        </td>
+
+                                                        <td>
+
+                                                            <div class="d-flex justify-content-center gap-1">
+
+                                                                <a href="aset_pindah_edit.php?id=<?= $r['id_riwayat'] ?>"
+                                                                    class="btn btn-warning btn-sm px-2"
+                                                                    title="Edit">
+
+                                                                    <i class="bi bi-pencil-square"></i>
+
+                                                                </a>
+
+                                                                <a href="aset_pindah_hapus.php?id=<?= $r['id_riwayat'] ?>"
+                                                                    class="btn btn-danger btn-sm px-2"
+                                                                    title="Hapus"
+                                                                    onclick="return confirm('Yakin ingin menghapus data ini?')">
+
+                                                                    <i class="bi bi-trash"></i>
+
+                                                                </a>
+
+                                                            </div>
+
+                                                        </td>
+
                                                     </tr>
+
                                                 <?php endforeach; ?>
+
                                             <?php endif; ?>
+
                                         </tbody>
+
                                     </table>
                                 </div>
-
                             </div>
                         </div>
                     </div>
