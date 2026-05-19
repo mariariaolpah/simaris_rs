@@ -16,50 +16,57 @@ function formatTanggal($tanggal)
     return date('d-m-Y', strtotime($tanggal));
 }
 
-// ================= PAGINATION ================= //
+// ================= PAGINATION & FILTER ================= //
 $limit = 8;
-
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
-
 $offset = ($page - 1) * $limit;
 
-// SEARCH
-$search = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $search = $_GET['search']) : "";
+// SEARCH & KATEGORI
+$search = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : "";
+$kategori_filter = isset($_GET['kategori']) ? $_GET['kategori'] : 'semua';
 
-// QUERY DATA
+$whereConditions = [];
+
+// Jika ada pencarian
 if ($search != '') {
-    $query = mysqli_query($koneksi, "SELECT * FROM perawatan 
-        WHERE nama_aset LIKE '%$search%' 
-        OR teknisi LIKE '%$search%' 
-        OR status LIKE '%$search%'
-        ORDER BY id DESC
-        LIMIT $limit OFFSET $offset
-    ");
-
-    $count = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM perawatan 
-        WHERE nama_aset LIKE '%$search%' 
-        OR teknisi LIKE '%$search%' 
-        OR status LIKE '%$search%'
-    ");
-} else {
-    $query = mysqli_query($koneksi, "SELECT * FROM perawatan 
-        ORDER BY id DESC
-        LIMIT $limit OFFSET $offset
-    ");
-
-    $count = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM perawatan");
+    $whereConditions[] = "(p.nama_aset LIKE '%$search%' 
+        OR p.teknisi LIKE '%$search%' 
+        OR p.status LIKE '%$search%'
+        OR a.lokasi LIKE '%$search%'
+        OR a.kategori_aset LIKE '%$search%')";
 }
 
-$total_row = mysqli_fetch_assoc($count);
-$total_data = $total_row['total'];
+// Jika ada filter tab kategori
+if ($kategori_filter == 'medis') {
+    $whereConditions[] = "a.kategori_aset = 'Medis'";
+} elseif ($kategori_filter == 'non-medis') {
+    $whereConditions[] = "a.kategori_aset = 'Non-Medis'";
+}
+
+$whereClause = "";
+if (count($whereConditions) > 0) {
+    $whereClause = "WHERE " . implode(" AND ", $whereConditions);
+}
+
+// ================= QUERY DATA (JOIN ASET FIX COLLATION) ================= //
+$count_query = mysqli_query($koneksi, "
+    SELECT COUNT(*) as total 
+    FROM perawatan p
+    LEFT JOIN aset a ON p.nama_aset COLLATE utf8mb4_general_ci = a.nama_aset COLLATE utf8mb4_general_ci
+    $whereClause
+");
+$total_data = mysqli_fetch_assoc($count_query)['total'];
 $total_page = ceil($total_data / $limit);
 
-// DATA ARRAY
-$perawatan_list = [];
-while ($row = mysqli_fetch_assoc($query)) {
-    $perawatan_list[] = $row;
-}
+$query = mysqli_query($koneksi, "
+    SELECT p.*, a.kategori_aset, a.lokasi 
+    FROM perawatan p
+    LEFT JOIN aset a ON p.nama_aset COLLATE utf8mb4_general_ci = a.nama_aset COLLATE utf8mb4_general_ci
+    $whereClause
+    ORDER BY p.id DESC
+    LIMIT $limit OFFSET $offset
+");
 ?>
 
 <!DOCTYPE html>
@@ -67,7 +74,7 @@ while ($row = mysqli_fetch_assoc($query)) {
 
 <head>
     <meta charset="UTF-8">
-    <title>Perawatan | SIMARIS RS Bhayangkara</title>
+    <title>Perawatan | SIMARIS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 
@@ -86,6 +93,7 @@ while ($row = mysqli_fetch_assoc($query)) {
         #page-content-wrapper {
             flex: 1;
             width: 100%;
+            overflow-x: hidden;
         }
 
         .dashboard-header {
@@ -101,6 +109,13 @@ while ($row = mysqli_fetch_assoc($query)) {
             padding: 40px 30px 50px 30px;
         }
 
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            background: #fff;
+        }
+
         .card-header {
             font-weight: 600;
             background: linear-gradient(90deg, #2c7a7b, #1cc88a);
@@ -108,11 +123,51 @@ while ($row = mysqli_fetch_assoc($query)) {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+            padding: 15px 20px;
         }
 
-        table th,
+        /* --- CSS TABS SEPERTI MENU KERUSAKAN --- */
+        .nav-tabs {
+            border-bottom: 2px solid #e2e8f0;
+            margin-top: 15px;
+            padding: 0 20px;
+        }
+
+        .nav-tabs .nav-link {
+            border: none;
+            padding: 12px 20px;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .nav-tabs .nav-link.active-medis {
+            color: #dc2626 !important;
+            border-bottom: 3px solid #dc2626;
+            background: #fffafb;
+        }
+
+        .nav-tabs .nav-link.active-nonmedis {
+            color: #0284c7 !important;
+            border-bottom: 3px solid #0284c7;
+            background: #f0f9ff;
+        }
+
+        .nav-tabs .nav-link.active-semua {
+            color: #16a34a !important;
+            border-bottom: 3px solid #16a34a;
+            background: #f0fdf4;
+        }
+
+        table th {
+            background: #f8fafc !important;
+            white-space: nowrap;
+        }
+
         table td {
             vertical-align: middle !important;
+            white-space: nowrap;
         }
 
         .btn-action {
@@ -121,7 +176,6 @@ while ($row = mysqli_fetch_assoc($query)) {
             justify-content: center;
         }
 
-        /* Animasi kedip untuk peringatan kalibrasi */
         .anim-blink {
             animation: blinker 1.5s linear infinite;
         }
@@ -143,10 +197,10 @@ while ($row = mysqli_fetch_assoc($query)) {
         <div id="page-content-wrapper">
 
             <div class="dashboard-header">
-                <h3>PERAWATAN / PEMELIHARAAN</h3>
+                <h4 class="fw-bold m-0"><i class="bi bi-tools"></i> PERAWATAN / PEMELIHARAAN</h4>
                 <div>
                     <i class="bi bi-person-circle"></i>
-                    <?= $_SESSION['nama_pengguna']; ?>
+                    <?= htmlspecialchars($_SESSION['nama_pengguna']); ?>
                 </div>
             </div>
 
@@ -156,39 +210,63 @@ while ($row = mysqli_fetch_assoc($query)) {
 
                     <div class="card-header">
 
-                        <span>Data Perawatan & Jadwal Kalibrasi</span>
+                        <span><i class="bi bi-calendar-check"></i> Data Perawatan & Jadwal Kalibrasi</span>
 
                         <div class="d-flex gap-2">
 
                             <form method="GET" class="d-flex gap-2">
+                                <input type="hidden" name="kategori" value="<?= htmlspecialchars($kategori_filter) ?>">
                                 <input type="text" name="search" class="form-control form-control-sm"
                                     value="<?= htmlspecialchars($search) ?>"
-                                    placeholder="Cari...">
+                                    placeholder="Cari aset...">
                                 <button class="btn btn-secondary btn-sm">
                                     <i class="bi bi-search"></i>
                                 </button>
                             </form>
 
-                            <a href="perawatan_tambah.php" class="btn btn-light btn-sm">
-                                + Tambah
+                            <a href="perawatan_tambah.php" class="btn btn-light btn-sm text-dark">
+                                <i class="bi bi-plus-lg"></i> Tambah
                             </a>
 
                             <a href="perawatan_cetak.php<?= $search ? '?search=' . urlencode($search) : '' ?>"
-                                class="btn btn-light btn-sm" target="_blank">
-                                Cetak PDF
+                                class="btn btn-danger btn-sm text-white" target="_blank">
+                                <i class="bi bi-file-earmark-pdf"></i> Cetak PDF
                             </a>
 
                         </div>
 
                     </div>
 
-                    <div class="card-body table-responsive">
+                    <ul class="nav nav-tabs">
+                        <li class="nav-item">
+                            <a class="nav-link <?= ($kategori_filter == 'medis') ? 'active-medis' : '' ?>"
+                                href="?kategori=medis<?= $search ? '&search=' . urlencode($search) : '' ?>">
+                                🏥 Aset Medis
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link <?= ($kategori_filter == 'non-medis') ? 'active-nonmedis' : '' ?>"
+                                href="?kategori=non-medis<?= $search ? '&search=' . urlencode($search) : '' ?>">
+                                🪑 Aset Non-Medis
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link <?= ($kategori_filter == 'semua') ? 'active-semua' : '' ?>"
+                                href="?kategori=semua<?= $search ? '&search=' . urlencode($search) : '' ?>">
+                                📋 Semua Aset
+                            </a>
+                        </li>
+                    </ul>
 
-                        <table class="table table-bordered table-hover text-center">
-                            <thead class="table-light">
+                    <div class="card-body table-responsive p-0 pt-2">
+
+                        <table class="table table-bordered table-hover text-center m-0">
+                            <thead>
                                 <tr>
                                     <th>#</th>
                                     <th>Nama Aset</th>
+                                    <th>Lokasi Ruangan</th>
+                                    <th>Kategori</th>
                                     <th>Teknisi</th>
                                     <th>Tgl Perawatan</th>
                                     <th>Jadwal Kalibrasi Berikutnya</th>
@@ -199,16 +277,36 @@ while ($row = mysqli_fetch_assoc($query)) {
 
                             <tbody>
 
-                                <?php if (empty($perawatan_list)): ?>
+                                <?php if (mysqli_num_rows($query) == 0): ?>
                                     <tr>
-                                        <td colspan="7">Tidak ada data</td>
+                                        <td colspan="9" class="py-5 text-center text-muted">
+                                            Tidak ada jadwal perawatan / kalibrasi di kategori ini.
+                                        </td>
                                     </tr>
                                 <?php else: ?>
 
-                                    <?php foreach ($perawatan_list as $i => $p): ?>
+                                    <?php
+                                    $no = $offset + 1;
+                                    while ($p = mysqli_fetch_assoc($query)):
+                                    ?>
                                         <tr>
-                                            <td><?= (($page - 1) * $limit) + $i + 1 ?></td>
+                                            <td><?= $no++ ?></td>
                                             <td class="text-start fw-bold"><?= htmlspecialchars($p['nama_aset']) ?></td>
+
+                                            <td class="text-start">
+                                                <i class="bi bi-geo-alt text-danger me-1"></i> <?= htmlspecialchars($p['lokasi'] ?? '-') ?>
+                                            </td>
+
+                                            <td>
+                                                <?php if (($p['kategori_aset'] ?? '') == 'Medis'): ?>
+                                                    <span class="badge bg-danger">Medis</span>
+                                                <?php elseif (($p['kategori_aset'] ?? '') == 'Non-Medis'): ?>
+                                                    <span class="badge bg-primary">Non-Medis</span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-secondary">-</span>
+                                                <?php endif; ?>
+                                            </td>
+
                                             <td><?= htmlspecialchars($p['teknisi']) ?></td>
                                             <td><?= formatTanggal($p['tanggal']) ?></td>
 
@@ -218,8 +316,7 @@ while ($row = mysqli_fetch_assoc($query)) {
                                                 if ($tgl_berikutnya && $tgl_berikutnya != '0000-00-00') {
                                                     echo "<span class='fw-bold'>" . formatTanggal($tgl_berikutnya) . "</span><br>";
 
-                                                    // Hitung selisih hari dari hari ini
-                                                    $selisih_detik = strtotime($tgl_berikutnya) - time();
+                                                    $selisih_detik = strtotime($tgl_berikutnya) - strtotime('today');
                                                     $selisih_hari = floor($selisih_detik / (60 * 60 * 24));
 
                                                     if ($selisih_hari <= 7 && $selisih_hari >= 0) {
@@ -242,53 +339,49 @@ while ($row = mysqli_fetch_assoc($query)) {
                                                 <?php elseif ($p['status'] == 'Sedang Proses'): ?>
                                                     <span class="badge bg-warning text-dark">Proses</span>
                                                 <?php else: ?>
-                                                    <span class="badge bg-secondary">Belum</span>
+                                                    <span class="badge bg-secondary">Belum Dimulai</span>
                                                 <?php endif; ?>
                                             </td>
 
-                                            <td class="btn-action">
-                                                <a href="perawatan_edit.php?id=<?= $p['id'] ?>" class="btn btn-warning btn-sm">
-                                                    <i class="bi bi-pencil-square"></i>
-                                                </a>
-                                                <a href="perawatan_hapus.php?id=<?= $p['id'] ?>" class="btn btn-danger btn-sm">
-                                                    <i class="bi bi-trash"></i>
-                                                </a>
+                                            <td>
+                                                <div class="btn-action">
+                                                    <a href="perawatan_edit.php?id=<?= $p['id'] ?>" class="btn btn-warning btn-sm text-white">
+                                                        <i class="bi bi-pencil-square"></i>
+                                                    </a>
+                                                    <a href="perawatan_hapus.php?id=<?= $p['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('Hapus data perawatan ini?')">
+                                                        <i class="bi bi-trash"></i>
+                                                    </a>
+                                                </div>
                                             </td>
                                         </tr>
-                                    <?php endforeach; ?>
+                                    <?php endwhile; ?>
 
                                 <?php endif; ?>
 
                             </tbody>
                         </table>
 
-                        <div class="d-flex justify-content-end mt-3">
-                            <nav>
-                                <ul class="pagination pagination-sm mb-0">
-
-                                    <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
-                                        <a class="page-link" href="?page=<?= $page - 1 ?>&search=<?= urlencode($search) ?>">
-                                            Prev
-                                        </a>
-                                    </li>
-
-                                    <li class="page-item disabled">
-                                        <span class="page-link">
-                                            <?= $page ?> / <?= $total_page ?>
-                                        </span>
-                                    </li>
-
-                                    <li class="page-item <?= ($page >= $total_page) ? 'disabled' : '' ?>">
-                                        <a class="page-link" href="?page=<?= $page + 1 ?>&search=<?= urlencode($search) ?>">
-                                            Next
-                                        </a>
-                                    </li>
-
-                                </ul>
-                            </nav>
-                        </div>
-
                     </div>
+
+                    <?php if ($total_page > 1): ?>
+                        <div class="card-footer bg-white border-0 pt-3 pb-3">
+                            <div class="d-flex justify-content-end">
+                                <nav>
+                                    <ul class="pagination pagination-sm mb-0">
+                                        <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
+                                            <a class="page-link" href="?kategori=<?= urlencode($kategori_filter) ?>&page=<?= $page - 1 ?><?= $search ? '&search=' . urlencode($search) : '' ?>">Prev</a>
+                                        </li>
+                                        <li class="page-item disabled">
+                                            <span class="page-link"><?= $page ?> / <?= $total_page ?></span>
+                                        </li>
+                                        <li class="page-item <?= ($page >= $total_page) ? 'disabled' : '' ?>">
+                                            <a class="page-link" href="?kategori=<?= urlencode($kategori_filter) ?>&page=<?= $page + 1 ?><?= $search ? '&search=' . urlencode($search) : '' ?>">Next</a>
+                                        </li>
+                                    </ul>
+                                </nav>
+                            </div>
+                        </div>
+                    <?php endif; ?>
 
                 </div>
 

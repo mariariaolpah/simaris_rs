@@ -25,6 +25,7 @@ if ($search != '') {
     $whereConditions[] = "(kerusakan.nama_aset LIKE '%$search%' 
         OR kerusakan.status LIKE '%$search%' 
         OR kerusakan.keterangan LIKE '%$search%'
+        OR kerusakan.pelapor LIKE '%$search%'
         OR aset.lokasi LIKE '%$search%')";
 }
 
@@ -245,6 +246,12 @@ $query = mysqli_query($koneksi, "
                                 <i class="bi bi-plus-lg"></i> Tambah
                             </a>
 
+                            <a href="kerusakan_cetak.php?kategori=<?= urlencode($kategori_filter) ?>&search=<?= urlencode($search) ?>"
+                                target="_blank"
+                                class="btn btn-light btn-sm">
+                                <i class="bi bi-file-earmark-pdf"></i> Cetak PDF
+                            </a>
+
                         </div>
 
                     </div>
@@ -286,6 +293,7 @@ $query = mysqli_query($koneksi, "
                                         <th>Nama Aset</th>
                                         <th>Lokasi Ruangan</th>
                                         <th>Kategori</th>
+                                        <th>Pelapor</th>
                                         <th>Tanggal Lapor</th>
                                         <th>Rincian Kerusakan</th>
                                         <th>Status</th>
@@ -298,7 +306,7 @@ $query = mysqli_query($koneksi, "
                                     <?php if (mysqli_num_rows($query) == 0): ?>
 
                                         <tr>
-                                            <td colspan="8" class="text-center py-5">
+                                            <td colspan="9" class="text-center py-5">
                                                 Tidak ada data kerusakan.
                                             </td>
                                         </tr>
@@ -334,6 +342,11 @@ $query = mysqli_query($koneksi, "
 
                                                     <?php endif; ?>
 
+                                                </td>
+
+                                                <td>
+                                                    <i class="bi bi-person text-secondary me-1"></i>
+                                                    <?= htmlspecialchars($row['pelapor'] ?? '-') ?>
                                                 </td>
 
                                                 <td>

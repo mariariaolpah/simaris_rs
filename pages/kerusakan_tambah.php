@@ -7,6 +7,11 @@ if (!isset($_SESSION['id_pengguna'])) {
 
 include(__DIR__ . '/../config/koneksi.php');
 
+// Pengecekan Role (Misal session kamu namanya 'level' atau 'role')
+// Sesuaikan kata 'level' di bawah ini dengan nama session yang kamu buat di manajemen akun
+$role_pengguna = isset($_SESSION['level']) ? strtolower($_SESSION['level']) : 'user';
+$is_admin = ($role_pengguna == 'admin');
+
 // Ambil seluruh daftar aset untuk pilihan pelaporan kerusakan
 $aset_query = mysqli_query($koneksi, "SELECT * FROM aset ORDER BY nama_aset ASC");
 
@@ -15,6 +20,7 @@ if (isset($_POST['simpan'])) {
     $status      = mysqli_real_escape_string($koneksi, $_POST['status']);
     $tanggal     = mysqli_real_escape_string($koneksi, $_POST['tanggal']);
     $keterangan  = mysqli_real_escape_string($koneksi, $_POST['keterangan']);
+    $pelapor     = mysqli_real_escape_string($koneksi, $_POST['pelapor']);
 
     // Ambil nama_aset berdasarkan id_aset pilihan user
     $aset_find  = mysqli_query($koneksi, "SELECT nama_aset FROM aset WHERE id_aset=$id_aset LIMIT 1");
@@ -22,8 +28,8 @@ if (isset($_POST['simpan'])) {
     $nama_aset  = $aset_row['nama_aset'];
 
     // Simpan data ke tabel kerusakan
-    $insert = mysqli_query($koneksi, "INSERT INTO kerusakan (nama_aset, status, tanggal, keterangan) 
-                            VALUES ('$nama_aset','$status','$tanggal','$keterangan')");
+    $insert = mysqli_query($koneksi, "INSERT INTO kerusakan (nama_aset, status, tanggal, keterangan, pelapor) 
+                            VALUES ('$nama_aset','$status','$tanggal','$keterangan', '$pelapor')");
 
     // Mengupdate langsung kondisi fisik aset utama di master data
     if ($status == "Rusak") {
@@ -139,6 +145,7 @@ if (isset($_POST['simpan'])) {
                 <h4 class="fw-bold m-0"><i class="bi bi-exclamation-triangle"></i> LAPOR KERUSAKAN</h4>
                 <div class="small fw-medium">
                     <i class="bi bi-person-circle-fill"></i> <?= htmlspecialchars($_SESSION['nama_pengguna']); ?>
+                    <span class="badge bg-light text-dark ms-1"><?= strtoupper($role_pengguna); ?></span>
                 </div>
             </div>
 
@@ -162,6 +169,22 @@ if (isset($_POST['simpan'])) {
                                         </option>
                                     <?php endwhile; ?>
                                 </select>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Nama Pelapor</label>
+                                <input type="text"
+                                    name="pelapor"
+                                    class="form-control <?= !$is_admin ? 'bg-light' : '' ?>"
+                                    value="<?= htmlspecialchars($_SESSION['nama_pengguna']); ?>"
+                                    <?= !$is_admin ? 'readonly' : '' ?>
+                                    required>
+
+                                <?php if ($is_admin): ?>
+                                    <div class="form-text text-primary"><i class="bi bi-info-circle"></i> Anda login sebagai Admin. Anda bisa mengubah nama ini jika melaporkan atas nama orang lain.</div>
+                                <?php else: ?>
+                                    <div class="form-text text-muted"><i class="bi bi-lock-fill"></i> Nama pelapor otomatis dikunci sesuai akun Anda.</div>
+                                <?php endif; ?>
                             </div>
 
                             <div class="highlight-danger">

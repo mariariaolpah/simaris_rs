@@ -21,13 +21,15 @@ if (isset($_POST['update'])) {
     $status     = mysqli_real_escape_string($koneksi, $_POST['status']);
     $tanggal    = mysqli_real_escape_string($koneksi, $_POST['tanggal']);
     $keterangan = mysqli_real_escape_string($koneksi, $_POST['keterangan']);
+    $pelapor    = mysqli_real_escape_string($koneksi, $_POST['pelapor']); // Ambil data pelapor
 
     // QUERY UPDATE DATA ASLI
     $update_query = mysqli_query($koneksi, "UPDATE kerusakan SET 
                     nama_aset='$nama_aset', 
                     status='$status', 
                     tanggal='$tanggal', 
-                    keterangan='$keterangan' 
+                    keterangan='$keterangan',
+                    pelapor='$pelapor' 
                     WHERE id=$id");
 
     // SINKRONISASI KONDISI KE TABEL MASTER ASET (OPSIONAL AGAR SEIRAMA)
@@ -159,10 +161,16 @@ if (isset($_POST['update'])) {
                     <div class="card-body p-4">
                         <form method="POST">
 
-                            <div class="mb-4">
-                                <label class="form-label">Nama Aset / Komponen Alat</label>
-                                <input type="text" name="nama_aset" class="form-control bg-light" value="<?= htmlspecialchars($k['nama_aset']) ?>" required readonly>
-                                <div class="form-text text-muted">Nama aset terkunci agar riwayat penanganan logistik tetap akurat.</div>
+                            <div class="row">
+                                <div class="col-md-6 mb-4">
+                                    <label class="form-label">Nama Aset / Komponen Alat</label>
+                                    <input type="text" name="nama_aset" class="form-control bg-light" value="<?= htmlspecialchars($k['nama_aset']) ?>" required readonly>
+                                    <div class="form-text text-muted">Nama aset terkunci agar akurat.</div>
+                                </div>
+                                <div class="col-md-6 mb-4">
+                                    <label class="form-label">Nama Pelapor</label>
+                                    <input type="text" name="pelapor" class="form-control" value="<?= htmlspecialchars($k['pelapor'] ?? '') ?>" required>
+                                </div>
                             </div>
 
                             <div class="highlight-danger">

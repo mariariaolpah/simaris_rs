@@ -8,20 +8,30 @@ if (!isset($_SESSION['id_pengguna'])) {
 require('../config/fpdf.php');
 include(__DIR__ . '/../config/koneksi.php');
 
+// Menangkap Pencarian (Abaikan Tab agar selalu cetak Semua)
 $search = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
-$sql = "SELECT * FROM perawatan";
+$whereClause = "";
 if ($search != '') {
-    $sql .= " WHERE nama_aset LIKE '%$search%' OR teknisi LIKE '%$search%' OR status LIKE '%$search%'";
+    $whereClause = "WHERE (p.nama_aset LIKE '%$search%' 
+        OR p.teknisi LIKE '%$search%' 
+        OR p.status LIKE '%$search%'
+        OR a.lokasi LIKE '%$search%')";
 }
-$sql .= " ORDER BY id DESC";
-$query = mysqli_query($koneksi, $sql);
 
-$pdf = new FPDF('L', 'mm', 'A4');
+// ORDER BY a.kategori_aset ASC agar "Medis" (M) tampil lebih dulu dari "Non-Medis" (N)
+$query = mysqli_query($koneksi, "
+    SELECT p.*, a.lokasi, a.kategori_aset 
+    FROM perawatan p
+    LEFT JOIN aset a ON p.nama_aset COLLATE utf8mb4_general_ci = a.nama_aset COLLATE utf8mb4_general_ci
+    $whereClause
+    ORDER BY a.kategori_aset ASC, p.id DESC
+");
+
+$pdf = new FPDF('L', 'mm', 'A4'); // Format Landscape
 $pdf->AddPage();
 
 /* ================= KOP SURAT ================= */
 $y = 8;
-
 $logoLeft  = realpath(__DIR__ . '/../assets/img/logo_dokpol.png');
 $logoRight = realpath(__DIR__ . '/../assets/img/logo_rs.jpg');
 
@@ -38,19 +48,17 @@ $pdf->Cell(0, 6, 'Jl. A. Yani Km. 3,5 Banjarmasin 70235', 0, 1, 'C');
 $pdf->Ln(15);
 
 /* ================= JUDUL ================= */
-$pdf->SetFont('Arial', 'B', 16);
-$pdf->Cell(0, 10, 'DATA PERAWATAN DAN KALIBRASI ASET', 0, 1, 'C');
+$pdf->SetFont('Arial', 'B', 14);
+$pdf->Cell(0, 10, 'DATA PERAWATAN DAN JADWAL KALIBRASI SELURUH ASET', 0, 1, 'C');
 $pdf->Ln(5);
 
 /* ================= HEADER TABEL ================= */
-$pdf->SetFont('Arial', 'B', 11);
-$pdf->SetFillColor(72, 201, 176); // SAMAIN WARNA HIJAU TOSCA
+$pdf->SetFont('Arial', 'B', 10);
+$pdf->SetFillColor(72, 201, 176);
 $pdf->SetTextColor(255);
 
-// Header diperbarui dengan Kalibrasi
-$header = ['No', 'Nama Aset', 'Teknisi', 'Tgl Perawatan', 'Jadwal Kalibrasi', 'Status'];
-// Lebar disesuaikan agar pas dengan A4 Landscape (~277mm)
-$widths = [10, 85, 45, 45, 45, 45];
+$header = ['No', 'Nama Aset', 'Ruangan', 'Kategori', 'Teknisi', 'Tgl Rawat', 'Kalibrasi', 'Status'];
+$widths = [10, 60, 35, 25, 40, 30, 42, 35];
 
 for ($i = 0; $i < count($header); $i++) {
     $pdf->Cell($widths[$i], 10, $header[$i], 1, 0, 'C', true);
@@ -58,26 +66,38 @@ for ($i = 0; $i < count($header); $i++) {
 $pdf->Ln();
 
 /* ================= ISI TABEL ================= */
-$pdf->SetFont('Arial', '', 10);
+$pdf->SetFont('Arial', '', 9);
 $pdf->SetTextColor(0);
 
 $i = 1;
-while ($row = mysqli_fetch_assoc($query)) {
-    // Format Tanggal
-    $tgl_rawat = ($row['tanggal'] && $row['tanggal'] != '0000-00-00') ? date('d-m-Y', strtotime($row['tanggal'])) : '-';
-    $tgl_kalibrasi = ($row['tanggal_kalibrasi_berikutnya'] && $row['tanggal_kalibrasi_berikutnya'] != '0000-00-00') ? date('d-m-Y', strtotime($row['tanggal_kalibrasi_berikutnya'])) : '-';
+if (mysqli_num_rows($query) > 0) {
+    while ($row = mysqli_fetch_assoc($query)) {
 
-    $pdf->Cell($widths[0], 8, $i++, 1, 0, 'C');
-    $pdf->Cell($widths[1], 8, ' ' . $row['nama_aset'], 1, 0, 'L');
-    $pdf->Cell($widths[2], 8, ' ' . $row['teknisi'], 1, 0, 'L');
-    $pdf->Cell($widths[3], 8, $tgl_rawat, 1, 0, 'C');
-    $pdf->Cell($widths[4], 8, $tgl_kalibrasi, 1, 0, 'C');
-    $pdf->Cell($widths[5], 8, $row['status'], 1, 1, 'C');
+        $lokasi = !empty($row['lokasi']) ? $row['lokasi'] : '-';
+        $kategori = !empty($row['kategori_aset']) ? $row['kategori_aset'] : '-';
+
+        $nama_aset = strlen($row['nama_aset']) > 32 ? substr($row['nama_aset'], 0, 30) . '...' : $row['nama_aset'];
+        $teknisi = strlen($row['teknisi']) > 20 ? substr($row['teknisi'], 0, 18) . '...' : $row['teknisi'];
+
+        $tgl_rawat = ($row['tanggal'] && $row['tanggal'] != '0000-00-00') ? date('d-m-Y', strtotime($row['tanggal'])) : '-';
+        $tgl_kalibrasi = ($row['tanggal_kalibrasi_berikutnya'] && $row['tanggal_kalibrasi_berikutnya'] != '0000-00-00') ? date('d-m-Y', strtotime($row['tanggal_kalibrasi_berikutnya'])) : '-';
+
+        $pdf->Cell($widths[0], 8, $i++, 1, 0, 'C');
+        $pdf->Cell($widths[1], 8, ' ' . $nama_aset, 1, 0, 'L');
+        $pdf->Cell($widths[2], 8, ' ' . $lokasi, 1, 0, 'L');
+        $pdf->Cell($widths[3], 8, $kategori, 1, 0, 'C');
+        $pdf->Cell($widths[4], 8, ' ' . $teknisi, 1, 0, 'L');
+        $pdf->Cell($widths[5], 8, $tgl_rawat, 1, 0, 'C');
+        $pdf->Cell($widths[6], 8, $tgl_kalibrasi, 1, 0, 'C');
+        $pdf->Cell($widths[7], 8, $row['status'], 1, 1, 'C');
+    }
+} else {
+    $pdf->SetFont('Arial', 'I', 10);
+    $pdf->Cell(array_sum($widths), 10, 'Tidak ada jadwal perawatan atau kalibrasi.', 1, 1, 'C');
 }
 
 /* ================= FOOTER ================= */
 $pdf->Ln(10);
-
 $pdf->SetFont('Arial', '', 10);
 $pdf->Cell(0, 5, 'Banjarmasin, ' . date('d F Y'), 0, 1, 'R');
 $pdf->Cell(0, 5, 'Mengetahui,', 0, 1, 'R');
@@ -89,16 +109,8 @@ $pdf->SetFont('Arial', 'B', 10);
 $pdf->Cell(0, 5, $_SESSION['nama_pengguna'], 0, 1, 'R');
 
 $pdf->Ln(5);
-
 $pdf->SetFont('Arial', 'I', 9);
-$pdf->Cell(
-    0,
-    5,
-    'Dicetak pada: ' . date('d-m-Y H:i:s') . ' oleh ' . $_SESSION['nama_pengguna'],
-    0,
-    1,
-    'R'
-);
+$pdf->Cell(0, 5, 'Dicetak pada: ' . date('d-m-Y H:i:s') . ' oleh ' . $_SESSION['nama_pengguna'], 0, 1, 'R');
 
 $pdf->Output();
 exit;
