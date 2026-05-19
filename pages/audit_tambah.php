@@ -151,15 +151,22 @@ if (isset($_POST['simpan'])) {
 
                             <div class="mb-4">
                                 <label class="form-label">Pilih Aset / Alat yang Diperiksa</label>
+
                                 <select name="id_aset" class="form-select" required>
-                                    <option value="">-- Pilih Alat Kesehatan / Infrastruktur RS --</option>
+                                    <option value="">-- Pilih Aset & Ruangan --</option>
+
                                     <?php while ($a = mysqli_fetch_assoc($aset_query)) : ?>
                                         <option value="<?= $a['id_aset'] ?>">
-                                            <?= htmlspecialchars($a['nama_aset']) ?> — (📍 Ruangan: <?= htmlspecialchars($a['lokasi']) ?>)
+                                            <?= htmlspecialchars($a['nama_aset']) ?>
+                                            | Ruangan: <?= htmlspecialchars($a['lokasi']) ?>
                                         </option>
                                     <?php endwhile; ?>
+
                                 </select>
-                                <div class="form-text text-muted">Pilih item inventaris rumah sakit yang sedang dilakukan pengecekan kondisi riil.</div>
+
+                                <div class="form-text text-muted">
+                                    Data ruangan otomatis diambil dari master data aset.
+                                </div>
                             </div>
 
                             <div class="row">

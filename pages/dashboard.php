@@ -293,7 +293,12 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
                         <p style="font-size: 2.5rem; font-weight: 700; margin: 0; color: #fff;"><?= $perawatan_selesai ?></p>
                     </div>
                 </div>
-
+                <div class="stat-card" style="background-color:#e74c3c;">
+                    <h6>Kalibrasi Mendesak</h6>
+                    <p style="font-size: 2.5rem; font-weight: 700; margin: 0; color: #fff;">
+                        <?= mysqli_num_rows($q_kalibrasi); ?>
+                    </p>
+                </div>
                 <div class="row g-3">
                     <div class="col-md-7">
                         <div class="card h-100">

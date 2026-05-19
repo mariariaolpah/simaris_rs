@@ -1,5 +1,6 @@
 <?php
 session_start();
+
 if (!isset($_SESSION['id_pengguna'])) {
     header("Location: ../login.php");
     exit;
@@ -8,106 +9,228 @@ if (!isset($_SESSION['id_pengguna'])) {
 require('../config/fpdf.php');
 include('../config/koneksi.php');
 
-$sql = "SELECT * FROM aset ORDER BY id_aset DESC";
+/* ================= QUERY ================= */
+
+$sql = "SELECT 
+            nama_aset,
+            kategori_aset,
+            jenis,
+            tipe_aset,
+            lokasi,
+            kondisi,
+            asal_usul,
+            harga,
+            umur_ekonomis,
+            tanggal_masuk,
+            dokumen
+        FROM aset
+        ORDER BY id_aset ASC";
+
 $result = mysqli_query($koneksi, $sql);
+
+/* ================= PDF ================= */
 
 $pdf = new FPDF('L', 'mm', 'A4');
 $pdf->AddPage();
 
+$pdf->SetMargins(8, 8, 8);
+
 /* ================= HEADER ================= */
+
 $logoLeft  = realpath(__DIR__ . '/../assets/img/logo_dokpol.png');
 $logoRight = realpath(__DIR__ . '/../assets/img/logo_rs.jpg');
 
-if (file_exists($logoLeft)) $pdf->Image($logoLeft, 15, 8, 25);
-if (file_exists($logoRight)) $pdf->Image($logoRight, 252, 8, 25);
+if (file_exists($logoLeft)) {
+    $pdf->Image($logoLeft, 10, 8, 20);
+}
 
-$pdf->SetFont('Arial', 'B', 16);
-$pdf->SetXY(0, 12);
-$pdf->Cell(0, 6, 'RUMKIT BHAYANGKARA TK. III BANJARMASIN', 0, 1, 'C');
+if (file_exists($logoRight)) {
+    $pdf->Image($logoRight, 267, 8, 18);
+}
 
-$pdf->SetFont('Arial', '', 12);
-$pdf->Cell(0, 6, 'Jl. A. Yani Km. 3,5 Banjarmasin 70235', 0, 1, 'C');
+$pdf->SetFont('Arial', 'B', 15);
+$pdf->Cell(0, 8, 'RUMKIT BHAYANGKARA TK. III BANJARMASIN', 0, 1, 'C');
 
-$pdf->SetY(32);
-$pdf->SetFont('Arial', 'B', 16);
-$pdf->Cell(0, 10, 'LAPORAN DATA ASET & INFRASTRUKTUR', 0, 1, 'C');
+$pdf->SetFont('Arial', '', 11);
+$pdf->Cell(0, 6, 'Jl. A. Yani Km. 3,5 Banjarmasin', 0, 1, 'C');
+
 $pdf->Ln(3);
 
-/* ================= TABLE ================= */
-$w = [10, 45, 25, 30, 40, 25, 35, 30, 25];
+$pdf->SetFont('Arial', 'B', 14);
+$pdf->Cell(0, 8, 'LAPORAN DATA ASET & INFRASTRUKTUR', 0, 1, 'C');
 
-$pdf->SetFont('Arial', 'B', 10);
-$pdf->SetFillColor(72, 201, 176);
+$pdf->Ln(3);
+
+/* ================= UKURAN TABEL ================= */
+
+$w = [
+    8,
+    38,
+    22,
+    20,
+    20,
+    32,
+    22,
+    24,
+    28,
+    18,
+    24,
+    24
+];
+
+/* ================= HEADER TABEL ================= */
+
+$pdf->SetFillColor(72, 201, 176); // HIJAU MUDA
 $pdf->SetTextColor(255);
+$pdf->SetFont('Arial', 'B', 7);
 
-$pdf->Cell($w[0], 10, 'No', 1, 0, 'C', true);
-$pdf->Cell($w[1], 10, 'Nama Aset', 1, 0, 'C', true);
-$pdf->Cell($w[2], 10, 'Jenis', 1, 0, 'C', true);
-$pdf->Cell($w[3], 10, 'Tipe', 1, 0, 'C', true);
-$pdf->Cell($w[4], 10, 'Lokasi', 1, 0, 'C', true);
-$pdf->Cell($w[5], 10, 'Kondisi', 1, 0, 'C', true);
-$pdf->Cell($w[6], 10, 'Harga', 1, 0, 'C', true);
-$pdf->Cell($w[7], 10, 'Tgl Masuk', 1, 0, 'C', true);
-$pdf->Cell($w[8], 10, 'Dokumen', 1, 1, 'C', true);
+$header = [
+    'No',
+    'Nama Aset',
+    'Kategori',
+    'Jenis',
+    'Tipe',
+    'Lokasi Ruangan',
+    'Kondisi',
+    'Asal Usul',
+    'Harga',
+    'Umur',
+    'Tgl Masuk',
+    'Dokumen'
+];
 
-$pdf->SetFont('Arial', '', 9);
+for ($i = 0; $i < count($header); $i++) {
+
+    $pdf->Cell($w[$i], 10, $header[$i], 1, 0, 'C', true);
+}
+
+$pdf->Ln();
+
+/* ================= BODY ================= */
+
 $pdf->SetTextColor(0);
+$pdf->SetFont('Arial', '', 6.5);
 
 $no = 1;
 
 while ($row = mysqli_fetch_assoc($result)) {
 
-    $x = $pdf->GetX();
-    $y = $pdf->GetY();
+    $nama      = $row['nama_aset'] ?? '-';
+    $kategori  = $row['kategori_aset'] ?? '-';
+    $jenis     = $row['jenis'] ?? '-';
+    $tipe      = $row['tipe_aset'] ?? '-';
+    $lokasi    = $row['lokasi'] ?? '-';
+    $kondisi   = $row['kondisi'] ?? '-';
+    $asal      = $row['asal_usul'] ?? '-';
+    $harga     = 'Rp ' . number_format($row['harga'] ?? 0, 0, ',', '.');
+    $umur      = ($row['umur_ekonomis'] ?? '-') . ' Th';
 
-    $pdf->Cell($w[0], 12, $no++, 1, 0, 'C');
-    $pdf->Cell($w[1], 12, substr($row['nama_aset'], 0, 25), 1);
-    $pdf->Cell($w[2], 12, substr($row['jenis'], 0, 15), 1);
-    $pdf->Cell($w[3], 12, substr($row['tipe_aset'], 0, 15), 1);
-    $pdf->Cell($w[4], 12, substr($row['lokasi'], 0, 20), 1);
-    $pdf->Cell($w[5], 12, $row['kondisi'], 1, 0, 'C');
-    $pdf->Cell($w[6], 12, number_format($row['harga'], 0, ',', '.'), 1, 0, 'R');
-    $pdf->Cell($w[7], 12, date('d/m/Y', strtotime($row['tanggal_masuk'])), 1, 0, 'C');
+    $tanggal = '-';
 
-    $file = __DIR__ . '/../assets/dokumen/' . $row['dokumen'];
+    if (!empty($row['tanggal_masuk']) && $row['tanggal_masuk'] != '0000-00-00') {
+        $tanggal = date('d/m/Y', strtotime($row['tanggal_masuk']));
+    }
 
-    if (!empty($row['dokumen']) && file_exists($file)) {
-        $pdf->Cell($w[8], 12, '', 1, 1);
+    $tinggi = 12;
 
-        $imgW = 10;
-        $imgH = 8;
+    /* ================= PAGE BREAK ================= */
 
-        $centerX = $x + array_sum(array_slice($w, 0, 8)) + ($w[8] / 2) - ($imgW / 2);
-        $centerY = $y + 2;
+    if ($pdf->GetY() + $tinggi > 185) {
 
-        $pdf->Image($file, $centerX, $centerY, $imgW, $imgH);
+        $pdf->AddPage();
+
+        $pdf->SetFillColor(72, 201, 176); // HIJAU MUDA
+        $pdf->SetTextColor(255);
+        $pdf->SetFont('Arial', 'B', 7);
+
+        for ($i = 0; $i < count($header); $i++) {
+
+            $pdf->Cell($w[$i], 10, $header[$i], 1, 0, 'C', true);
+        }
+
+        $pdf->Ln();
+
+        $pdf->SetTextColor(0);
+        $pdf->SetFont('Arial', '', 6.5);
+    }
+
+    /* ================= CETAK DATA ================= */
+
+    $pdf->Cell($w[0], $tinggi, $no++, 1, 0, 'C');
+
+    $pdf->Cell($w[1], $tinggi, utf8_decode(substr($nama, 0, 28)), 1, 0, 'L');
+
+    $pdf->Cell($w[2], $tinggi, utf8_decode(substr($kategori, 0, 15)), 1, 0, 'C');
+
+    $pdf->Cell($w[3], $tinggi, utf8_decode(substr($jenis, 0, 15)), 1, 0, 'C');
+
+    $pdf->Cell($w[4], $tinggi, utf8_decode(substr($tipe, 0, 15)), 1, 0, 'C');
+
+    $pdf->Cell($w[5], $tinggi, utf8_decode(substr($lokasi, 0, 22)), 1, 0, 'L');
+
+    $pdf->Cell($w[6], $tinggi, utf8_decode(substr($kondisi, 0, 15)), 1, 0, 'C');
+
+    $pdf->Cell($w[7], $tinggi, utf8_decode(substr($asal, 0, 18)), 1, 0, 'C');
+
+    $pdf->Cell($w[8], $tinggi, $harga, 1, 0, 'R');
+
+    $pdf->Cell($w[9], $tinggi, $umur, 1, 0, 'C');
+
+    $pdf->Cell($w[10], $tinggi, $tanggal, 1, 0, 'C');
+
+    /* ================= DOKUMEN ================= */
+
+    $dokumen = $row['dokumen'] ?? '';
+
+    $file = __DIR__ . '/../assets/dokumen/' . $dokumen;
+
+    if (!empty($dokumen) && file_exists($file)) {
+
+        $x = $pdf->GetX();
+        $y = $pdf->GetY();
+
+        $pdf->Cell($w[11], $tinggi, '', 1, 1);
+
+        $pdf->Image($file, $x + 7, $y + 2, 10, 8);
     } else {
-        $pdf->Cell($w[8], 12, '-', 1, 1, 'C');
+
+        $pdf->Cell($w[11], $tinggi, 'Tidak Ada', 1, 1, 'C');
     }
 }
 
-/* ================= FOOTER (DI BAWAH TABEL - KANAN) ================= */
-
-$pdf->Ln(5); // kasih jarak sedikit dari tabel
-
-$pdf->SetFont('Arial', '', 11);
-
-// ambil posisi terakhir (biar tidak turun ke bawah halaman)
-$y = $pdf->GetY();
-
-$pdf->SetY($y);
-$pdf->Cell(0, 6, 'Banjarmasin, ' . date('d F Y'), 0, 1, 'R');
-$pdf->Cell(0, 6, 'Mengetahui,', 0, 1, 'R');
-$pdf->Cell(0, 6, 'Administrator', 0, 1, 'R');
-
-$pdf->Ln(10);
-
-$pdf->SetFont('Arial', 'B', 11);
-$pdf->Cell(0, 6, $_SESSION['nama_pengguna'], 0, 1, 'R');
+/* ================= FOOTER ================= */
 
 $pdf->Ln(5);
 
-$pdf->SetFont('Arial', 'I', 9);
-$pdf->Cell(0, 6, 'Dicetak pada: ' . date('d-m-Y H:i:s') . ' oleh ' . $_SESSION['nama_pengguna'], 0, 1, 'R');
+$pdf->SetFont('Arial', '', 10);
+
+$pdf->Cell(0, 6, 'Banjarmasin, ' . date('d F Y'), 0, 1, 'R');
+
+$pdf->Cell(0, 6, 'Mengetahui,', 0, 1, 'R');
+
+$pdf->Cell(0, 6, 'Administrator', 0, 1, 'R');
+
+$pdf->Ln(12);
+
+$pdf->SetFont('Arial', 'B', 10);
+
+$pdf->Cell(0, 6, $_SESSION['nama_pengguna'], 0, 1, 'R');
+
+$pdf->Ln(2);
+
+$pdf->SetFont('Arial', 'I', 8);
+
+$pdf->Cell(
+    0,
+    6,
+    'Dicetak pada: ' . date('d-m-Y H:i:s') . ' oleh ' . $_SESSION['nama_pengguna'],
+    0,
+    1,
+    'R'
+);
+
+/* ================= OUTPUT ================= */
+
 $pdf->Output();
+
 exit;
