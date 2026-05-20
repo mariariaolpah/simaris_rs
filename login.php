@@ -26,7 +26,7 @@ if (isset($_POST['login'])) {
                 $_SESSION['id_pengguna'] = $user['id_pengguna'];
                 $_SESSION['nama_pengguna'] = $user['nama_pengguna'];
                 $_SESSION['role'] = $user['role'];
-
+                $_SESSION['level'] = $user['role']; // <--- INI BARIS PENYELAMATNYA
                 // arahkan
                 if ($user['role'] == 'admin') {
                     header("Location: pages/dashboard.php");
