@@ -1,11 +1,14 @@
 <?php
 session_start();
+
+// 1. Cek apakah pengguna sudah login
 if (!isset($_SESSION['id_pengguna'])) {
     header("Location: ../login.php");
     exit;
 }
 
-if ($_SESSION['level'] != 'user') {
+// 2. Cek aman dengan isset() agar PHP tidak protes saat session kosong
+if (isset($_SESSION['level']) && strtolower(trim($_SESSION['level'])) == 'admin') {
     header("Location: dashboard.php");
     exit;
 }
@@ -39,113 +42,105 @@ if (isset($_POST['simpan'])) {
 <head>
     <meta charset="UTF-8">
     <title>Buat Laporan Kerusakan</title>
-
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
 
     <style>
         body {
+            background-color: #f8fafc;
             font-family: 'Poppins', sans-serif;
-            background: linear-gradient(135deg, #f0fdfa, #ccfbf1);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+        }
+
+        #page-content-wrapper {
+            margin-left: 230px;
+            padding: 25px 35px;
+        }
+
+        .container-form {
+            max-width: 550px;
+            margin: 0 auto;
         }
 
         .card {
             border: none;
-            border-radius: 15px;
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
         }
 
         .card-header {
             background: linear-gradient(90deg, #2c7a7b, #1cc88a);
-            color: #fff;
-            font-weight: 600;
-            font-size: 1.2rem;
-            border-top-left-radius: 15px;
-            border-top-right-radius: 15px;
+            color: white;
+            font-weight: bold;
+            border-radius: 12px 12px 0 0 !important;
             padding: 15px 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        }
+
+        .form-control,
+        .form-select {
+            border-radius: 8px;
         }
 
         .btn-success {
             background: linear-gradient(90deg, #2c7a7b, #1cc88a);
             border: none;
+            border-radius: 8px;
             font-weight: 500;
-            transition: all 0.3s ease;
-        }
-
-        .btn-success:hover {
-            background: linear-gradient(90deg, #319795, #17a673);
-            transform: translateY(-2px);
-        }
-
-        .container-form {
-            width: 100%;
-            max-width: 550px;
-            margin: 30px auto;
-        }
-
-        .form-control {
-            border-radius: 10px;
-            padding: 10px 12px;
         }
     </style>
 </head>
 
 <body>
 
-    <div class="container-form">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-bug"></i> Laporan Kerusakan Aset
-            </div>
+    <?php include __DIR__ . '/sidebar_user.php'; ?>
 
-            <div class="card-body">
-                <form method="POST">
+    <div id="page-content-wrapper">
+        <h4 class="fw-bold text-dark mb-4">Buat Laporan Kerusakan</h4>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Nama Aset</label>
-                        <select name="nama_aset" class="form-control" required>
-                            <option value="">-- Pilih Aset --</option>
-                            <?php while ($row = mysqli_fetch_assoc($aset)) : ?>
-                                <option value="<?= $row['nama_aset']; ?>"><?= $row['nama_aset']; ?></option>
-                            <?php endwhile; ?>
-                        </select>
-                    </div>
+        <div class="container-form">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-bug"></i> Laporan Kerusakan Aset
+                </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Status Kerusakan</label>
-                        <select name="status" class="form-control" required>
-                            <option value="Rusak">Rusak</option>
-                            <option value="Perlu Perawatan">Perlu Perawatan</option>
-                            <option value="Dalam Perbaikan">Dalam Perbaikan</option>
-                        </select>
-                    </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Nama Aset</label>
+                            <select name="nama_aset" class="form-control" required>
+                                <option value="">-- Pilih Aset --</option>
+                                <?php while ($row = mysqli_fetch_assoc($aset)) : ?>
+                                    <option value="<?= $row['nama_aset']; ?>"><?= $row['nama_aset']; ?></option>
+                                <?php endwhile; ?>
+                            </select>
+                        </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Keterangan</label>
-                        <textarea name="keterangan" class="form-control" required></textarea>
-                    </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Status Kerusakan</label>
+                            <select name="status" class="form-control" required>
+                                <option value="Rusak">Rusak</option>
+                                <option value="Perlu Perawatan">Perlu Perawatan</option>
+                                <option value="Dalam Perbaikan">Dalam Perbaikan</option>
+                            </select>
+                        </div>
 
-                    <div class="d-flex justify-content-end gap-2">
-                        <button type="submit" name="simpan" class="btn btn-success px-4">
-                            <i class="bi bi-send"></i> Kirim
-                        </button>
-                        <a href="user_data_kerusakan.php" class="btn btn-secondary px-4">
-                            <i class="bi bi-x-circle"></i> Batal
-                        </a>
-                    </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Keterangan</label>
+                            <textarea name="keterangan" class="form-control" required></textarea>
+                        </div>
 
-                </form>
+                        <div class="d-flex justify-content-end gap-2 mt-3">
+                            <a href="user_data_kerusakan.php" class="btn btn-secondary px-4">
+                                <i class="bi bi-x-circle"></i> Batal
+                            </a>
+                            <button type="submit" name="simpan" class="btn btn-success px-4">
+                                <i class="bi bi-send"></i> Kirim
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
-
 </body>
 
 </html>

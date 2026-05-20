@@ -48,7 +48,7 @@ $query = mysqli_query($koneksi, "
     FROM peminjaman 
     JOIN aset ON peminjaman.id_aset = aset.id_aset 
     $whereClause
-    ORDER BY peminjaman.id_pinjam DESC
+    ORDER BY peminjaman.id_pinjam ASC
     LIMIT $offset, $batas
 ");
 ?>
@@ -111,7 +111,6 @@ $query = mysqli_query($koneksi, "
             align-items: center;
         }
 
-        /* STYLE NAV TABS SAMA PERSIS DARI ASET.PHP */
         .nav-tabs {
             border-bottom: 2px solid #e2e8f0;
             margin-top: 15px;
@@ -153,7 +152,6 @@ $query = mysqli_query($koneksi, "
             background: #f0fdf4;
         }
 
-        /* STYLE TABEL SAMA PERSIS DARI ASET.PHP (MENCEGAH TEKS KETUMPUK) */
         .table-responsive {
             border-radius: 0 0 12px 12px;
             overflow-x: auto;
@@ -177,7 +175,6 @@ $query = mysqli_query($koneksi, "
         table td {
             vertical-align: middle !important;
             white-space: nowrap;
-            /* Teks memanjang horizontal, tabel otomatis melebar rapi */
             padding: 12px 16px !important;
             font-size: 0.9rem;
             color: #4a5568;
@@ -187,7 +184,6 @@ $query = mysqli_query($koneksi, "
             background-color: #fafffd !important;
         }
 
-        /* BADGE KATEGORI SAMA PERSIS DARI ASET.PHP */
         .badge-medis {
             background-color: #fee2e2;
             color: #dc2626;
@@ -209,14 +205,26 @@ $query = mysqli_query($koneksi, "
 </head>
 
 <body>
+
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055;">
+        <div id="notifToast" class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="bi bi-bell-fill me-2"></i> <span id="notifMessage">Ada pengajuan peminjaman baru!</span>
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
     <div id="wrapper">
         <?php include(__DIR__ . '/../sidebar.php'); ?>
         <div id="page-content-wrapper">
             <div class="dashboard-header">
                 <h4 class="fw-bold m-0"><i class="bi bi-box-seam"></i> PEMINJAMAN ALAT</h4>
                 <div class="small fw-medium">
-                    <i class="bi bi-person-circle-fill"></i> <?= htmlspecialchars($_SESSION['nama_pengguna']); ?>
-                    <span class="badge bg-light text-dark ms-1" style="text-transform: uppercase;"><?= htmlspecialchars($_SESSION['level']); ?></span>
+                    <i class="bi bi-person-circle-fill"></i> <?= htmlspecialchars($_SESSION['nama_pengguna'] ?? 'Admin'); ?>
+                    <span class="badge bg-light text-dark ms-1" style="text-transform: uppercase;"><?= htmlspecialchars($_SESSION['level'] ?? $_SESSION['role'] ?? 'Admin'); ?></span>
                 </div>
             </div>
             <div class="content">
@@ -239,17 +247,17 @@ $query = mysqli_query($koneksi, "
                     <ul class="nav nav-tabs">
                         <li class="nav-item">
                             <a class="nav-link <?= ($kategori_filter == 'medis') ? 'active-medis' : '' ?>" href="?kategori=medis<?= $search ? '&search=' . urlencode($search) : '' ?>">
-                                🏥 Aset Medis (Alkes)
+                                🩺 Aset Medis (Alkes)
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link <?= ($kategori_filter == 'non-medis') ? 'active-nonmedis' : '' ?>" href="?kategori=non-medis<?= $search ? '&search=' . urlencode($search) : '' ?>">
-                                🪑 Aset Non-Medis
+                                🗄️ Aset Non-Medis
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link <?= ($kategori_filter == 'semua') ? 'active-semua' : '' ?>" href="?kategori=semua<?= $search ? '&search=' . urlencode($search) : '' ?>">
-                                📋 Semua Aset
+                                📦 Semua Aset
                             </a>
                         </li>
                     </ul>
@@ -280,7 +288,21 @@ $query = mysqli_query($koneksi, "
                                         <?php while ($row = mysqli_fetch_assoc($query)): ?>
                                             <tr>
                                                 <td class="text-secondary"><?= $no++ ?></td>
-                                                <td class="fw-bold text-dark text-start"><?= htmlspecialchars($row['nama_peminjam']) ?></td>
+
+                                                <td class="fw-bold text-dark text-start">
+                                                    <?= htmlspecialchars($row['nama_peminjam']) ?>
+                                                    <br>
+                                                    <?php if (isset($row['sumber']) && $row['sumber'] == 'App User'): ?>
+                                                        <span class="badge bg-primary mt-1" style="font-size: 0.65rem; font-weight: normal;">
+                                                            <i class="bi bi-phone"></i> Via App User
+                                                        </span>
+                                                    <?php else: ?>
+                                                        <span class="badge bg-secondary mt-1" style="font-size: 0.65rem; font-weight: normal;">
+                                                            <i class="bi bi-person-workspace"></i> Input Admin
+                                                        </span>
+                                                    <?php endif; ?>
+                                                </td>
+
                                                 <td class="text-start"><?= htmlspecialchars($row['nama_aset']) ?></td>
 
                                                 <td>
@@ -298,15 +320,23 @@ $query = mysqli_query($koneksi, "
                                                 <td><?= (!empty($row['tanggal_kembali']) && $row['tanggal_kembali'] != '0000-00-00') ? date('d-m-Y', strtotime($row['tanggal_kembali'])) : '-' ?></td>
 
                                                 <td>
-                                                    <span class="badge <?= $row['status_pinjam'] == 'Dipinjam' ? 'bg-warning text-dark' : 'bg-success' ?>">
-                                                        <?= $row['status_pinjam'] ?>
-                                                    </span>
+                                                    <?php if ($row['status_pinjam'] == 'Menunggu Persetujuan'): ?>
+                                                        <span class="badge bg-danger shadow-sm px-3 py-2"><i class="bi bi-hourglass-split"></i> Pending</span>
+                                                    <?php else: ?>
+                                                        <span class="badge <?= $row['status_pinjam'] == 'Dipinjam' ? 'bg-warning text-dark' : 'bg-success' ?>">
+                                                            <?= $row['status_pinjam'] ?>
+                                                        </span>
+                                                    <?php endif; ?>
                                                 </td>
 
                                                 <td>
                                                     <div class="d-flex gap-1 justify-content-center">
-                                                        <?php if ($row['status_pinjam'] == 'Dipinjam'): ?>
-                                                            <a href="peminjaman_kembali.php?id=<?= $row['id_pinjam'] ?>" class="btn btn-success btn-sm" style="border-radius: 6px;" title="Kembalikan Alat">
+                                                        <?php if ($row['status_pinjam'] == 'Menunggu Persetujuan'): ?>
+                                                            <a href="peminjaman_approve.php?id=<?= $row['id_pinjam'] ?>" class="btn btn-primary btn-sm" style="border-radius: 6px;" title="Setujui Peminjaman" onclick="return confirm('Apakah fisik alat ini siap dan Anda menyetujui peminjaman ini?')">
+                                                                <i class="bi bi-check-lg"></i>
+                                                            </a>
+                                                        <?php elseif ($row['status_pinjam'] == 'Dipinjam'): ?>
+                                                            <a href="peminjaman_kembali.php?id=<?= $row['id_pinjam'] ?>" class="btn btn-success btn-sm" style="border-radius: 6px;" title="Kembalikan Alat" onclick="return confirm('Konfirmasi pengembalian alat?')">
                                                                 <i class="bi bi-arrow-return-left"></i>
                                                             </a>
                                                         <?php endif; ?>
@@ -345,6 +375,89 @@ $query = mysqli_query($koneksi, "
             </div>
         </div>
     </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        let lastPendingCount = 0;
+        let blinkInterval;
+        let originalTitle = "Peminjaman Alat | SIMARIS";
+        let isBlinking = false;
+
+        // Fungsi untuk membuat Tab Browser kelap-kelip
+        function startBlinkingTitle(pesan) {
+            if (isBlinking) return;
+            isBlinking = true;
+            blinkInterval = setInterval(function() {
+                document.title = (document.title === originalTitle) ? pesan : originalTitle;
+            }, 1000); // Berganti setiap 1 detik
+        }
+
+        // Fungsi untuk menghentikan kelap-kelip saat admin klik layar
+        function stopBlinkingTitle() {
+            if (isBlinking) {
+                clearInterval(blinkInterval);
+                document.title = originalTitle;
+                isBlinking = false;
+            }
+        }
+
+        // Hentikan kedipan jika Admin mengklik area mana saja di halaman
+        document.body.addEventListener('click', stopBlinkingTitle);
+
+        // Fungsi untuk mengecek notifikasi baru ke database
+        function cekNotifikasi() {
+            $.ajax({
+                url: 'peminjaman_cek_notif.php',
+                type: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    if (response.pending_count > lastPendingCount) {
+                        // 1. Memicu Tab Kelap-kelip
+                        startBlinkingTitle("🔴 [" + response.pending_count + "] PENGAJUAN BARU!");
+
+                        // 2. Tampilkan Pop Up Kanan Atas
+                        let toastEl = document.getElementById('notifToast');
+                        let toast = new bootstrap.Toast(toastEl);
+                        document.getElementById('notifMessage').innerText = "Ada " + response.pending_count + " pengajuan baru yang menunggu persetujuan!";
+                        toast.show();
+
+                        // 3. Reload otomatis halaman setelah 4 detik biar datanya muncul
+                        setTimeout(function() {
+                            location.reload();
+                        }, 4000);
+                    }
+                    lastPendingCount = response.pending_count;
+                }
+            });
+        }
+
+        // Cek saat halaman pertama kali dibuka
+        $(document).ready(function() {
+            $.ajax({
+                url: 'peminjaman_cek_notif.php',
+                type: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    lastPendingCount = response.pending_count;
+
+                    if (lastPendingCount > 0) {
+                        // Jika saat dibuka memang ada yang pending, langsung kelap-kelip
+                        startBlinkingTitle("🔴 [" + lastPendingCount + "] MENUNGGU PERSETUJUAN!");
+
+                        let toastEl = document.getElementById('notifToast');
+                        let toast = new bootstrap.Toast(toastEl);
+                        document.getElementById('notifMessage').innerText = "Jangan lupa, ada " + lastPendingCount + " pengajuan belum diproses!";
+                        toast.show();
+                    }
+                }
+            });
+        });
+
+        // Jalankan pengecekan setiap 10 detik
+        setInterval(cekNotifikasi, 10000);
+    </script>
 </body>
 
 </html>

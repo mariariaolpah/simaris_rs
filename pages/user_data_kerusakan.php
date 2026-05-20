@@ -1,11 +1,14 @@
 <?php
 session_start();
+
+// 1. Cek apakah pengguna sudah login
 if (!isset($_SESSION['id_pengguna'])) {
     header("Location: ../login.php");
     exit;
 }
 
-if ($_SESSION['level'] != 'user') {
+// 2. Cek aman dengan isset() agar PHP tidak error saat session kosong
+if (isset($_SESSION['level']) && strtolower(trim($_SESSION['level'])) == 'admin') {
     header("Location: dashboard.php");
     exit;
 }
@@ -53,16 +56,13 @@ $kerusakan = mysqli_query($koneksi, "SELECT * FROM kerusakan ORDER BY id DESC");
             font-weight: bold;
         }
 
-        /* Warna Status Baru */
         .rusak {
             background-color: #dc3545;
-            /* Merah */
             color: white;
         }
 
         .baik {
             background-color: #28a745;
-            /* Hijau */
             color: white;
         }
 
@@ -70,13 +70,11 @@ $kerusakan = mysqli_query($koneksi, "SELECT * FROM kerusakan ORDER BY id DESC");
         .pending,
         .proses {
             background-color: #ffc107;
-            /* Kuning */
             color: black;
         }
 
         .selesai {
             background-color: #198754;
-            /* Hijau Gelap */
             color: white;
         }
     </style>
@@ -89,22 +87,18 @@ $kerusakan = mysqli_query($koneksi, "SELECT * FROM kerusakan ORDER BY id DESC");
 
     <div id="page-content-wrapper">
 
-        <!-- JUDUL -->
         <h4 class="fw-bold text-dark">Laporan Kerusakan</h4>
         <p class="text-muted">Berikut daftar kerusakan aset yang anda laporkan.</p>
 
-        <!-- SEARCH + FILTER + PDF -->
         <div class="card p-3 shadow-sm mb-3">
             <div class="row g-3 align-items-center">
 
-                <!-- Kolom Pencarian (ukuran sama persis contoh) -->
                 <div class="col-md-4">
                     <input type="text" id="searchInput" class="form-control"
                         placeholder="Cari laporan..."
                         style="flex: 2; padding:10px; font-size:14px;">
                 </div>
 
-                <!-- Kolom Filter (ukuran sama persis contoh) -->
                 <div class="col-md-4">
                     <select id="filterStatus" class="form-select"
                         style="flex: 1.2; padding:10px; font-size:14px;">
@@ -118,17 +112,13 @@ $kerusakan = mysqli_query($koneksi, "SELECT * FROM kerusakan ORDER BY id DESC");
                     </select>
                 </div>
 
-                <!-- Tombol Reset + PDF di kanan pojok -->
                 <div class="col-md-4 d-flex justify-content-end gap-2">
-
-                    <!-- Tombol Reset (ukuran sama persis contoh) -->
                     <button class="btn btn-success"
                         onclick="resetFilter()"
                         style="flex: 0.5; padding:10px 14px; font-size:14px;">
                         <i class="bi bi-arrow-clockwise"></i>
                     </button>
 
-                    <!-- Tombol PDF (identik dengan contoh) -->
                     <a href="cetak_kerusakan_user.php" target="_blank"
                         class="btn btn-danger"
                         style="flex: 0.8; padding:10px 14px; font-size:14px;">
@@ -138,8 +128,6 @@ $kerusakan = mysqli_query($koneksi, "SELECT * FROM kerusakan ORDER BY id DESC");
             </div>
         </div>
 
-
-        <!-- TABLE -->
         <div class="card shadow-sm">
             <div class="card-body p-0">
                 <table class="table table-bordered mb-0" id="tabelKerusakan">
@@ -158,7 +146,6 @@ $kerusakan = mysqli_query($koneksi, "SELECT * FROM kerusakan ORDER BY id DESC");
                         $no = 1;
                         while ($row = mysqli_fetch_assoc($kerusakan)):
 
-                            // Mapping Warna Status
                             switch ($row['status']) {
                                 case "Rusak":
                                     $badgeClass = "rusak";
@@ -198,7 +185,6 @@ $kerusakan = mysqli_query($koneksi, "SELECT * FROM kerusakan ORDER BY id DESC");
         </div>
     </div>
 
-    <!-- MODAL DETAIL -->
     <div class="modal fade" id="detailModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">

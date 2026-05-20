@@ -13,6 +13,9 @@
             <i class="bi bi-box me-2"></i> Data Aset
         </a>
 
+        <a href="user_ajukan_peminjaman.php" class="list-group-item">
+            <i class="bi bi-cart-plus me-2"></i> Ajukan Peminjaman
+        </a>
         <a href="user_data_kerusakan.php" class="list-group-item">
             <i class="bi bi-file-earmark-text me-2"></i> Laporan Kerusakan
         </a>
