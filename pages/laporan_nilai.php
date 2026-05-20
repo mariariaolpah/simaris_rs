@@ -10,7 +10,8 @@ include(__DIR__ . '/../header.php');
 ?>
 
 <style>
-    .filter-form input {
+    .filter-form input,
+    .filter-form select {
         border-radius: 8px;
         padding: 6px 10px;
         border: 1px solid #ccc;
@@ -47,13 +48,15 @@ include(__DIR__ . '/../header.php');
     $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
     $perPage = 10;
 
-    $search = $_GET['search'] ?? '';
-    $dari = $_GET['dari'] ?? '';
-    $sampai = $_GET['sampai'] ?? '';
+    // SINKRONISASI FILTER PENCARIAN
+    $search = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
+    $kategoriFilter = isset($_GET['kategori']) ? mysqli_real_escape_string($koneksi, $_GET['kategori']) : '';
+    $dari = isset($_GET['dari']) ? mysqli_real_escape_string($koneksi, $_GET['dari']) : '';
+    $sampai = isset($_GET['sampai']) ? mysqli_real_escape_string($koneksi, $_GET['sampai']) : '';
 
-    $where = ["harga > 0"];
-
+    $where = ["harga > 0"]; // Hanya aset yang memiliki harga
     if ($search != '') $where[] = "(nama_aset LIKE '%$search%' OR asal_usul LIKE '%$search%')";
+    if ($kategoriFilter != '') $where[] = "kategori_aset = '$kategoriFilter'";
     if ($dari != '') $where[] = "tanggal_masuk >= '$dari'";
     if ($sampai != '') $where[] = "tanggal_masuk <= '$sampai'";
 
@@ -72,18 +75,17 @@ include(__DIR__ . '/../header.php');
     while ($rowStat = mysqli_fetch_assoc($statSumQ)) {
         $total_aset++;
         $harga_awal = $rowStat['harga'];
-        // Pastikan kolom umur_ekonomis ada isinya, jika kosong anggap 0
         $umur_eko = isset($rowStat['umur_ekonomis']) ? (int)$rowStat['umur_ekonomis'] : 0;
         $tahun_masuk = date('Y', strtotime($rowStat['tanggal_masuk']));
 
         $total_harga_awal += $harga_awal;
 
-        // Logika Depresiasi untuk kotak Total
+        // Logika Depresiasi
         $nilai_buku = $harga_awal;
         if ($umur_eko > 0) {
             $selisih_tahun = $tahun_sekarang - $tahun_masuk;
             if ($selisih_tahun < 0) $selisih_tahun = 0;
-            if ($selisih_tahun > $umur_eko) $selisih_tahun = $umur_eko; // Jika aset sudah lewat umur, nilainya habis jadi 0
+            if ($selisih_tahun > $umur_eko) $selisih_tahun = $umur_eko;
 
             $penyusutan_per_tahun = $harga_awal / $umur_eko;
             $akumulasi = $selisih_tahun * $penyusutan_per_tahun;
@@ -92,62 +94,70 @@ include(__DIR__ . '/../header.php');
         $total_nilai_saat_ini += $nilai_buku;
     }
 
-    // data untuk tabel (dengan pagination)
+    $countQ = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM aset $whereSQL");
+    $totalRow = mysqli_fetch_assoc($countQ)['total'];
     $offset = ($page - 1) * $perPage;
-    $dataQ = mysqli_query($koneksi, "SELECT * FROM aset $whereSQL ORDER BY tanggal_masuk DESC LIMIT $offset,$perPage");
+
+    $dataQ = mysqli_query($koneksi, "SELECT * FROM aset $whereSQL ORDER BY tanggal_masuk DESC LIMIT $offset, $perPage");
     ?>
 
-    <div class="d-flex justify-content-between mb-3 mt-3">
+    <div class="d-flex justify-content-between align-items-center mb-3 mt-3">
         <form class="d-flex gap-2 filter-form" method="GET">
-            <input type="text" name="search" placeholder="Cari aset..." value="<?= htmlspecialchars($search) ?>">
+            <input type="text" name="search" placeholder="Cari aset/asal usul..." value="<?= htmlspecialchars($search) ?>">
+
+            <select name="kategori">
+                <option value="">Semua Kategori</option>
+                <option value="Medis" <?= $kategoriFilter == 'Medis' ? 'selected' : '' ?>>Medis</option>
+                <option value="Non-Medis" <?= $kategoriFilter == 'Non-Medis' ? 'selected' : '' ?>>Non-Medis</option>
+            </select>
+
             <input type="date" name="dari" value="<?= htmlspecialchars($dari) ?>">
             <input type="date" name="sampai" value="<?= htmlspecialchars($sampai) ?>">
-            <button class="btn btn-success btn-sm">🔍 Filter</button>
+            <button class="btn btn-success btn-sm" type="submit">🔍 Filter</button>
         </form>
 
-        <a href="laporan_nilai_cetak.php?<?= http_build_query($_GET) ?>"
-            class="btn btn-danger btn-sm" target="_blank">🖨 Cetak PDF</a>
+        <a href="laporan_nilai_cetak.php?<?= http_build_query($_GET) ?>" class="btn btn-danger btn-sm" target="_blank">🖨 Cetak PDF</a>
     </div>
 
     <div class="stats">
         <div class="stat border-start border-primary border-4">
-            <small class="text-muted d-block">Jumlah Aset</small>
+            <small class="text-muted d-block">Jumlah Aset Ternilai</small>
             <span class="fs-5 fw-bold"><?= $total_aset ?> Unit</span>
         </div>
         <div class="stat border-start border-warning border-4">
-            <small class="text-muted d-block">Total Harga Beli (Awal)</small>
+            <small class="text-muted d-block">Total Nilai Investasi (Awal)</small>
             <span class="fs-5 fw-bold">Rp <?= number_format($total_harga_awal, 0, ',', '.') ?></span>
         </div>
         <div class="stat border-start border-success border-4">
-            <small class="text-muted d-block">Total Nilai Buku (Setelah Susut)</small>
+            <small class="text-muted d-block">Total Nilai Buku (Saat Ini)</small>
             <span class="fs-5 fw-bold text-success">Rp <?= number_format($total_nilai_saat_ini, 0, ',', '.') ?></span>
         </div>
     </div>
 
     <div class="card shadow-sm mt-3">
-        <div class="card-header">Rincian Penyusutan Aset (Metode Garis Lurus)</div>
+        <div class="card-header">Rincian Penyusutan Nilai Aset (Garis Lurus)</div>
         <div class="card-body p-0 table-responsive">
-            <table class="table table-bordered table-hover text-center mb-0">
+            <table class="table table-bordered table-hover text-center mb-0 align-middle">
                 <thead class="table-light">
                     <tr>
                         <th rowspan="2" class="align-middle">No</th>
-                        <th rowspan="2" class="align-middle">Nama Aset</th>
+                        <th rowspan="2" class="align-middle text-start">Nama Aset</th>
                         <th rowspan="2" class="align-middle">Kategori</th>
                         <th rowspan="2" class="align-middle">Tahun Masuk</th>
                         <th rowspan="2" class="align-middle">Umur Eko.</th>
-                        <th colspan="3">Data Keuangan</th>
+                        <th colspan="3">Data Keuangan & Depresiasi</th>
                     </tr>
                     <tr>
-                        <th>Harga Beli</th>
+                        <th>Harga Beli Awal</th>
                         <th>Susut / Tahun</th>
-                        <th>Nilai Saat Ini</th>
+                        <th>Nilai Buku (Saat Ini)</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php
                     $no = $offset + 1;
                     if (mysqli_num_rows($dataQ) == 0) {
-                        echo "<tr><td colspan='8'>Data tidak ditemukan</td></tr>";
+                        echo "<tr><td colspan='8' class='py-4'>Data aset dengan nilai tidak ditemukan</td></tr>";
                     }
 
                     while ($r = mysqli_fetch_assoc($dataQ)) {
@@ -157,7 +167,6 @@ include(__DIR__ . '/../header.php');
                         $thn_masuk = date('Y', strtotime($tgl_masuk));
                         $kategori = isset($r['kategori_aset']) ? $r['kategori_aset'] : '-';
 
-                        // PERHITUNGAN DEPRESIASI PER BARIS
                         $susut_per_tahun = 0;
                         $nilai_sekarang = $harga;
 
@@ -166,13 +175,12 @@ include(__DIR__ . '/../header.php');
 
                             $pakai = $tahun_sekarang - $thn_masuk;
                             if ($pakai < 0) $pakai = 0;
-                            if ($pakai > $umur) $pakai = $umur; // Jika lewat umur, nilai susut maksimal
+                            if ($pakai > $umur) $pakai = $umur;
 
                             $akumulasi = $pakai * $susut_per_tahun;
                             $nilai_sekarang = $harga - $akumulasi;
                         }
 
-                        // Label Kategori
                         $badge = ($kategori == 'Medis') ? '<span class="badge bg-danger">Medis</span>' : '<span class="badge bg-primary">Non-Medis</span>';
                         if ($kategori == '-' || empty($kategori)) $badge = '<span class="badge bg-secondary">-</span>';
 
@@ -194,6 +202,20 @@ include(__DIR__ . '/../header.php');
         </div>
     </div>
 
+    <?php
+    $totalPages = ceil($totalRow / $perPage);
+    if ($totalPages > 1) {
+        echo '<nav aria-label="Page navigation" style="margin-top:12px;"><ul class="pagination">';
+        $queryParams = $_GET;
+        for ($p = 1; $p <= $totalPages; $p++) {
+            $queryParams['page'] = $p;
+            $url = 'laporan_nilai.php?' . http_build_query($queryParams);
+            $active = $p == $page ? 'active' : '';
+            echo "<li class='page-item $active'><a class='page-link' href='$url'>$p</a></li>";
+        }
+        echo '</ul></nav>';
+    }
+    ?>
 </div>
 
 <?php include(__DIR__ . '/../footer.php'); ?>

@@ -21,15 +21,17 @@ if (isset($_POST['update'])) {
     $status     = mysqli_real_escape_string($koneksi, $_POST['status']);
     $tanggal    = mysqli_real_escape_string($koneksi, $_POST['tanggal']);
     $keterangan = mysqli_real_escape_string($koneksi, $_POST['keterangan']);
-    $pelapor    = mysqli_real_escape_string($koneksi, $_POST['pelapor']); // Ambil data pelapor
+    $pelapor    = mysqli_real_escape_string($koneksi, $_POST['pelapor']);
+    $teknisi    = mysqli_real_escape_string($koneksi, $_POST['teknisi']); // Menangkap data teknisi
 
-    // QUERY UPDATE DATA ASLI
+    // QUERY UPDATE DATA ASLI (Menambahkan kolom teknisi)
     $update_query = mysqli_query($koneksi, "UPDATE kerusakan SET 
                     nama_aset='$nama_aset', 
                     status='$status', 
                     tanggal='$tanggal', 
                     keterangan='$keterangan',
-                    pelapor='$pelapor' 
+                    pelapor='$pelapor',
+                    teknisi='$teknisi' 
                     WHERE id=$id");
 
     // SINKRONISASI KONDISI KE TABEL MASTER ASET (OPSIONAL AGAR SEIRAMA)
@@ -179,17 +181,21 @@ if (isset($_POST['update'])) {
                             </div>
 
                             <div class="row">
-                                <div class="col-md-6 mb-4">
-                                    <label class="form-label">Status Perbaikan Saat Ini</label>
+                                <div class="col-md-4 mb-4">
+                                    <label class="form-label">Status Perbaikan</label>
                                     <select name="status" class="form-select border-danger" required>
-                                        <option value="Rusak" <?= $k['status'] == 'Rusak' ? 'selected' : '' ?>>Rusak (Mati Total / Berat)</option>
+                                        <option value="Rusak" <?= $k['status'] == 'Rusak' ? 'selected' : '' ?>>Rusak (Mati Total)</option>
                                         <option value="Perlu Perawatan" <?= $k['status'] == 'Perlu Perawatan' ? 'selected' : '' ?>>Perlu Perawatan</option>
-                                        <option value="Dalam Perbaikan" <?= $k['status'] == 'Dalam Perbaikan' ? 'selected' : '' ?>>Dalam Perbaikan (Sedang Ditangani)</option>
+                                        <option value="Dalam Perbaikan" <?= $k['status'] == 'Dalam Perbaikan' ? 'selected' : '' ?>>Dalam Perbaikan</option>
                                         <option value="Selesai Diperbaiki" <?= $k['status'] == 'Selesai Diperbaiki' ? 'selected' : '' ?>>Selesai Diperbaiki</option>
                                     </select>
                                 </div>
-                                <div class="col-md-6 mb-4">
-                                    <label class="form-label">Tanggal Pembaruan Laporan</label>
+                                <div class="col-md-4 mb-4">
+                                    <label class="form-label">Ditangani Teknisi</label>
+                                    <input type="text" name="teknisi" class="form-control" placeholder="Nama Teknisi..." value="<?= htmlspecialchars($k['teknisi'] ?? '') ?>">
+                                </div>
+                                <div class="col-md-4 mb-4">
+                                    <label class="form-label">Tanggal Pembaruan</label>
                                     <input type="date" name="tanggal" class="form-control" value="<?= htmlspecialchars($k['tanggal']) ?>" required>
                                 </div>
                             </div>

@@ -22,10 +22,12 @@ $kategori_filter = isset($_GET['kategori']) ? $_GET['kategori'] : 'medis';
 $whereConditions = [];
 
 if ($search != '') {
+    // Menambahkan pencarian berdasarkan nama teknisi agar mempermudah admin
     $whereConditions[] = "(kerusakan.nama_aset LIKE '%$search%' 
         OR kerusakan.status LIKE '%$search%' 
         OR kerusakan.keterangan LIKE '%$search%'
         OR kerusakan.pelapor LIKE '%$search%'
+        OR kerusakan.teknisi LIKE '%$search%'
         OR aset.lokasi LIKE '%$search%')";
 }
 
@@ -233,7 +235,7 @@ $query = mysqli_query($koneksi, "
                                 <input type="text"
                                     name="search"
                                     class="form-control form-control-sm"
-                                    placeholder="Cari aset..."
+                                    placeholder="Cari aset/teknisi..."
                                     value="<?= htmlspecialchars($search) ?>">
 
                                 <button class="btn btn-light btn-sm">
@@ -296,6 +298,7 @@ $query = mysqli_query($koneksi, "
                                         <th>Pelapor</th>
                                         <th>Tanggal Lapor</th>
                                         <th>Rincian Kerusakan</th>
+                                        <th>Teknisi</th>
                                         <th>Status</th>
                                         <th>Aksi</th>
                                     </tr>
@@ -306,7 +309,7 @@ $query = mysqli_query($koneksi, "
                                     <?php if (mysqli_num_rows($query) == 0): ?>
 
                                         <tr>
-                                            <td colspan="9" class="text-center py-5">
+                                            <td colspan="10" class="text-center py-5">
                                                 Tidak ada data kerusakan.
                                             </td>
                                         </tr>
@@ -357,6 +360,10 @@ $query = mysqli_query($koneksi, "
 
                                                 <td class="kolom-keterangan">
                                                     <?= htmlspecialchars($row['keterangan']) ?>
+                                                </td>
+
+                                                <td class="fw-medium">
+                                                    <?= htmlspecialchars($row['teknisi'] ?? '-') ?>
                                                 </td>
 
                                                 <td>

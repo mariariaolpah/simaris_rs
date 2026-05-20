@@ -9,7 +9,6 @@ require('../config/fpdf.php');
 include(__DIR__ . '/../config/koneksi.php');
 
 // ================= AMBIL DATA PENCARIAN (OPSIONAL) ================= //
-// Kita abaikan parameter 'kategori' dari URL agar PDF SELALU mencetak SEMUA DATA
 $search = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
 
 $whereClause = "";
@@ -18,11 +17,11 @@ if ($search != '') {
         OR kerusakan.status LIKE '%$search%' 
         OR kerusakan.keterangan LIKE '%$search%' 
         OR kerusakan.pelapor LIKE '%$search%' 
+        OR kerusakan.teknisi LIKE '%$search%' 
         OR aset.lokasi LIKE '%$search%')";
 }
 
 // ================= QUERY DATA (JOIN ASET & PENGURUTAN) ================= //
-// ORDER BY aset.kategori_aset ASC memastikan "Medis" (M) muncul duluan sebelum "Non-Medis" (N)
 $query = mysqli_query($koneksi, "
     SELECT 
         kerusakan.*,
@@ -66,10 +65,11 @@ $pdf->SetFont('Arial', 'B', 9);
 $pdf->SetFillColor(72, 201, 176); // Warna Hijau Tosca
 $pdf->SetTextColor(255);
 
-// Total Widths = 277mm (A4 Landscape Printable Area)
-$widths = [10, 45, 35, 20, 25, 22, 35, 85];
+// Penyesuaian Total Widths (Total harus tetap 277mm untuk kertas A4 Landscape)
+$widths = [10, 40, 30, 20, 25, 25, 20, 30, 77];
 
-$header = ['No', 'Nama Aset', 'Lokasi Ruangan', 'Kategori', 'Pelapor', 'Tanggal', 'Status', 'Rincian Kerusakan'];
+// Menambahkan Header 'Teknisi'
+$header = ['No', 'Nama Aset', 'Lokasi', 'Kategori', 'Pelapor', 'Teknisi', 'Tanggal', 'Status', 'Rincian Kerusakan'];
 
 for ($i = 0; $i < count($header); $i++) {
     $pdf->Cell($widths[$i], 9, $header[$i], 1, 0, 'C', true);
@@ -83,23 +83,25 @@ $pdf->SetTextColor(0);
 $i = 1;
 if (mysqli_num_rows($query) > 0) {
     while ($row = mysqli_fetch_assoc($query)) {
-        // Cek jika kosong
-        $lokasi = !empty($row['lokasi']) ? $row['lokasi'] : '-';
+        // Cek jika data kosong, berikan strip (-)
+        $lokasi   = !empty($row['lokasi']) ? $row['lokasi'] : '-';
         $kategori = !empty($row['kategori_aset']) ? $row['kategori_aset'] : '-';
-        $pelapor = !empty($row['pelapor']) ? $row['pelapor'] : '-';
+        $pelapor  = !empty($row['pelapor']) ? $row['pelapor'] : '-';
+        $teknisi  = !empty($row['teknisi']) ? $row['teknisi'] : '-';
 
-        // Membatasi panjang teks agar rapi
-        $nama_aset = strlen($row['nama_aset']) > 30 ? substr($row['nama_aset'], 0, 28) . '...' : $row['nama_aset'];
-        $keterangan = strlen($row['keterangan']) > 60 ? substr($row['keterangan'], 0, 58) . '...' : $row['keterangan'];
+        // Membatasi panjang teks agar tidak tumpah dan rapi
+        $nama_aset  = strlen($row['nama_aset']) > 25 ? substr($row['nama_aset'], 0, 23) . '...' : $row['nama_aset'];
+        $keterangan = strlen($row['keterangan']) > 55 ? substr($row['keterangan'], 0, 52) . '...' : $row['keterangan'];
 
         $pdf->Cell($widths[0], 8, $i++, 1, 0, 'C');
         $pdf->Cell($widths[1], 8, $nama_aset, 1, 0, 'L');
         $pdf->Cell($widths[2], 8, $lokasi, 1, 0, 'L');
         $pdf->Cell($widths[3], 8, $kategori, 1, 0, 'C');
         $pdf->Cell($widths[4], 8, $pelapor, 1, 0, 'L');
-        $pdf->Cell($widths[5], 8, date('d-m-Y', strtotime($row['tanggal'])), 1, 0, 'C');
-        $pdf->Cell($widths[6], 8, $row['status'], 1, 0, 'C');
-        $pdf->Cell($widths[7], 8, $keterangan, 1, 1, 'L');
+        $pdf->Cell($widths[5], 8, $teknisi, 1, 0, 'L'); // Tambahan sel Teknisi
+        $pdf->Cell($widths[6], 8, date('d-m-Y', strtotime($row['tanggal'])), 1, 0, 'C');
+        $pdf->Cell($widths[7], 8, $row['status'], 1, 0, 'C');
+        $pdf->Cell($widths[8], 8, $keterangan, 1, 1, 'L');
     }
 } else {
     // Jika data kosong

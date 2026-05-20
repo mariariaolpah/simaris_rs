@@ -7,10 +7,17 @@ if (!isset($_SESSION['id_pengguna'])) {
 
 include(__DIR__ . '/../config/koneksi.php');
 include(__DIR__ . '/../header.php');
+
+function formatTanggal($tanggal)
+{
+    if (!$tanggal || $tanggal == '0000-00-00') return '-';
+    return date('d-m-Y', strtotime($tanggal));
+}
 ?>
 
 <style>
-    .filter-form input {
+    .filter-form input,
+    .filter-form select {
         border-radius: 8px;
         padding: 6px 10px;
         border: 1px solid #ccc;
@@ -22,24 +29,10 @@ include(__DIR__ . '/../header.php');
         font-weight: 600;
     }
 
-    .stats {
-        display: flex;
-        gap: 12px;
-        margin-bottom: 12px;
-    }
-
-    .stat {
-        background: #fff;
-        padding: 10px 14px;
-        border-radius: 8px;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, .05);
-    }
-
     .status-sedang {
         background-color: #fff3cd;
         color: #856404;
         font-weight: 600;
-        text-align: center;
         border-radius: 6px;
         padding: 3px 8px;
     }
@@ -48,7 +41,6 @@ include(__DIR__ . '/../header.php');
         background-color: #d4edda;
         color: #155724;
         font-weight: 600;
-        text-align: center;
         border-radius: 6px;
         padding: 3px 8px;
     }
@@ -60,123 +52,111 @@ include(__DIR__ . '/../header.php');
 
 <div class="content">
     <?php
-    // Pagination
     $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
     $perPage = 10;
-    $offset = ($page - 1) * $perPage;
-
-    // Filter
     $search = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
-    $dari = isset($_GET['dari']) ? mysqli_real_escape_string($koneksi, $_GET['dari']) : '';
-    $sampai = isset($_GET['sampai']) ? mysqli_real_escape_string($koneksi, $_GET['sampai']) : '';
+    $kategoriFilter = isset($_GET['kategori']) ? mysqli_real_escape_string($koneksi, $_GET['kategori']) : '';
 
-    // WHERE clause
-    $where = ["1=1"];
-    if ($search !== '') $where[] = "nama_aset LIKE '%$search%'";
-    if ($dari !== '') $where[] = "tanggal >= '$dari'";
-    if ($sampai !== '') $where[] = "tanggal <= '$sampai'";
+    $where = ["(kerusakan.status = 'Dalam Perbaikan' OR kerusakan.status = 'Selesai Diperbaiki')"];
+    if ($search !== '') $where[] = "(kerusakan.nama_aset LIKE '%$search%' OR kerusakan.keterangan LIKE '%$search%' OR kerusakan.teknisi LIKE '%$search%' OR kerusakan.pelapor LIKE '%$search%' OR aset.lokasi LIKE '%$search%')";
+    if ($kategoriFilter !== '') $where[] = "aset.kategori_aset = '$kategoriFilter'";
+
     $whereSQL = implode(" AND ", $where);
 
-    // Total data
-    $totalQ = mysqli_query($koneksi, "
-        SELECT COUNT(*) AS total 
-        FROM kerusakan 
-        WHERE $whereSQL 
-        AND (status = 'Dalam Perbaikan' OR status = 'Selesai Diperbaiki')
-    ");
-    $totalRow = mysqli_fetch_assoc($totalQ)['total'];
+    $countQ = mysqli_query($koneksi, "SELECT COUNT(*) AS total FROM kerusakan LEFT JOIN aset ON kerusakan.nama_aset = aset.nama_aset COLLATE utf8mb4_general_ci WHERE $whereSQL");
+    $totalRow = mysqli_fetch_assoc($countQ)['total'];
+    $offset = ($page - 1) * $perPage;
 
-    // Ambil data dari tabel kerusakan
+    // Perubahan Query: Menambahkan aset.lokasi
     $dataQ = mysqli_query($koneksi, "
-        SELECT id, nama_aset, status, tanggal, keterangan
-        FROM kerusakan
+        SELECT kerusakan.*, aset.kategori_aset, aset.lokasi 
+        FROM kerusakan 
+        LEFT JOIN aset ON kerusakan.nama_aset = aset.nama_aset COLLATE utf8mb4_general_ci
         WHERE $whereSQL 
-        AND (status = 'Dalam Perbaikan' OR status = 'Selesai Diperbaiki')
-        ORDER BY tanggal DESC, nama_aset ASC
-        LIMIT $offset, $perPage
+        ORDER BY kerusakan.tanggal DESC LIMIT $offset, $perPage
     ");
     ?>
 
-    <!-- Filter -->
     <div class="d-flex justify-content-between align-items-center mb-3">
         <form class="d-flex gap-2 filter-form" method="GET">
-            <input type="text" name="search" placeholder="Cari aset..." value="<?= htmlspecialchars($search) ?>">
-            <input type="date" name="dari" value="<?= $dari ?>">
-            <input type="date" name="sampai" value="<?= $sampai ?>">
+            <input type="text" name="search" placeholder="Cari aset/ruang/teknisi..." value="<?= htmlspecialchars($search) ?>">
+            <select name="kategori">
+                <option value="">Semua Kategori</option>
+                <option value="Medis" <?= $kategoriFilter == 'Medis' ? 'selected' : '' ?>>Medis</option>
+                <option value="Non-Medis" <?= $kategoriFilter == 'Non-Medis' ? 'selected' : '' ?>>Non-Medis</option>
+            </select>
             <button class="btn btn-success btn-sm" type="submit">🔍 Filter</button>
         </form>
+        <a href="cetak_laporan_perbaikan.php?<?= http_build_query($_GET) ?>" class="btn btn-danger btn-sm" target="_blank">🖨 Cetak PDF</a>
+    </div>
 
-        <div>
-            <a href="export_perbaikan_excel.php?<?= http_build_query($_GET) ?>" class="btn btn-outline-primary btn-sm">📥 Excel</a>
-            <a href="cetak_laporan_perbaikan.php?<?= http_build_query($_GET) ?>" class="btn btn-danger btn-sm" target="_blank">🖨 Cetak PDF</a>
+    <div class="card">
+        <div class="card-header">Data Perbaikan Aset</div>
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover m-0 align-middle text-center">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:50px;">No</th>
+                        <th class="text-start">Nama Aset</th>
+                        <th>Lokasi Ruangan</th>
+                        <th>Kategori</th>
+                        <th>Pelapor</th>
+                        <th>Teknisi</th>
+                        <th>Status</th>
+                        <th>Tanggal</th>
+                        <th class="text-start">Keterangan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    if (mysqli_num_rows($dataQ) == 0) {
+                        echo "<tr><td colspan='9' class='text-center py-4'>Belum ada data perbaikan</td></tr>";
+                    } else {
+                        $no = $offset + 1;
+                        while ($row = mysqli_fetch_assoc($dataQ)) {
+                            $statusClass = ($row['status'] == 'Selesai Diperbaiki') ? 'status-selesai' : 'status-sedang';
+
+                            $nama_aset  = htmlspecialchars($row['nama_aset'] ?? '-');
+                            $lokasi     = htmlspecialchars($row['lokasi'] ?? '-');
+                            $pelapor    = htmlspecialchars($row['pelapor'] ?? '-');
+                            $teknisi    = htmlspecialchars($row['teknisi'] ?? '-');
+                            $keterangan = htmlspecialchars($row['keterangan'] ?? '-');
+                            $status     = htmlspecialchars($row['status'] ?? '-');
+
+                            echo "<tr>
+                                <td>{$no}</td>
+                                <td class='text-start fw-bold'>{$nama_aset}</td>
+                                <td><i class='bi bi-geo-alt text-danger me-1'></i> {$lokasi}</td>
+                                <td>" . (($row['kategori_aset'] ?? '') == 'Medis' ? '<span class="badge bg-danger">Medis</span>' : '<span class="badge bg-primary">Non-Medis</span>') . "</td>
+                                <td>{$pelapor}</td>
+                                <td class='fw-medium'>{$teknisi}</td>
+                                <td><span class='{$statusClass}'>{$status}</span></td>
+                                <td>" . formatTanggal($row['tanggal']) . "</td>
+                                <td class='text-start'>{$keterangan}</td>
+                            </tr>";
+                            $no++;
+                        }
+                    }
+                    ?>
+                </tbody>
+            </table>
         </div>
     </div>
 
-    <!-- Statistik -->
-    <div class="stats mb-3">
-        <div class="stat">Total Data: <strong><?= intval($totalRow) ?></strong></div>
-    </div>
-
-    <!-- Tabel -->
-    <div class="card">
-        <div class="card-header">Data Perbaikan Aset</div>
-        <table class="table table-bordered table-striped" style="border:1px solid #ccc;">
-            <thead style="background-color:#f8f9fa;">
-                <tr>
-                    <th style="border:1px solid #ccc;">#</th>
-                    <th style="border:1px solid #ccc;">Nama Aset</th>
-                    <th style="border:1px solid #ccc;">Status</th>
-                    <th style="border:1px solid #ccc;">Tanggal</th>
-                    <th style="border:1px solid #ccc;">Keterangan</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php
-                $no = $offset + 1;
-                if (mysqli_num_rows($dataQ) == 0) {
-                    echo "<tr><td colspan='5' class='text-center' style='border:1px solid #ccc;'>Belum ada data perbaikan</td></tr>";
-                } else {
-                    while ($row = mysqli_fetch_assoc($dataQ)) {
-                        // Tentukan warna status otomatis
-                        $statusClass = '';
-                        if ($row['status'] == 'Selesai Diperbaiki') {
-                            $statusClass = 'status-selesai';
-                        } elseif ($row['status'] == 'Dalam Perbaikan') {
-                            $statusClass = 'status-sedang';
-                        }
-
-                        echo "
-                            <tr>
-                                <td style='border:1px solid #ccc;'>{$no}</td>
-                                <td style='border:1px solid #ccc;'>{$row['nama_aset']}</td>
-                                <td style='border:1px solid #ccc;'><span class='{$statusClass}'>{$row['status']}</span></td>
-                                <td style='border:1px solid #ccc;'>{$row['tanggal']}</td>
-                                <td style='border:1px solid #ccc;'>{$row['keterangan']}</td>
-                            </tr>
-                        ";
-                        $no++;
-                    }
-                }
-                ?>
-            </tbody>
-        </table>
-
-        <!-- Pagination -->
-        <?php
-        $totalPages = ceil($totalRow / $perPage);
-        if ($totalPages > 1) {
-            echo '<nav aria-label="Page navigation" style="margin-top:12px;"><ul class="pagination">';
-            $queryParams = $_GET;
-            for ($p = 1; $p <= $totalPages; $p++) {
-                $queryParams['page'] = $p;
-                $url = 'laporan_perbaikan.php?' . http_build_query($queryParams);
-                $active = $p == $page ? 'active' : '';
-                echo "<li class='page-item $active'><a class='page-link' href='$url'>$p</a></li>";
-            }
-            echo '</ul></nav>';
+    <?php
+    $totalPages = ceil($totalRow / $perPage);
+    if ($totalPages > 1) {
+        echo '<nav aria-label="Page navigation" style="margin-top:12px;"><ul class="pagination">';
+        $queryParams = $_GET;
+        for ($p = 1; $p <= $totalPages; $p++) {
+            $queryParams['page'] = $p;
+            $url = 'laporan_perbaikan.php?' . http_build_query($queryParams);
+            $active = $p == $page ? 'active' : '';
+            echo "<li class='page-item $active'><a class='page-link' href='$url'>$p</a></li>";
         }
-        ?>
-    </div>
+        echo '</ul></nav>';
+    }
+    ?>
 </div>
 
 <?php include(__DIR__ . '/../footer.php'); ?>

@@ -38,144 +38,157 @@ include(__DIR__ . '/../header.php');
 </style>
 
 <div class="dashboard-header">
-    <h3 class="mb-0">Laporan Audit Fisik</h3>
+    <h3 class="mb-0">Laporan Audit Fisik Aset</h3>
 </div>
 
 <div class="content">
     <?php
     $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
     $perPage = 10;
+    $offset = ($page - 1) * $perPage;
 
     $search = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
+    $kondisi = isset($_GET['kondisi']) ? mysqli_real_escape_string($koneksi, $_GET['kondisi']) : '';
+    $kategoriFilter = isset($_GET['kategori']) ? mysqli_real_escape_string($koneksi, $_GET['kategori']) : '';
     $dari = isset($_GET['dari']) ? mysqli_real_escape_string($koneksi, $_GET['dari']) : '';
     $sampai = isset($_GET['sampai']) ? mysqli_real_escape_string($koneksi, $_GET['sampai']) : '';
 
     $where = [];
-
-    if ($search !== '') {
-        $where[] = "(aset.nama_aset LIKE '%$search%' OR audit_fisik.keterangan LIKE '%$search%' OR audit_fisik.auditor LIKE '%$search%')";
-    }
-    if ($dari !== '') $where[] = "tanggal_audit >= '$dari'";
-    if ($sampai !== '') $where[] = "tanggal_audit <= '$sampai'";
+    if ($search !== '') $where[] = "(a.nama_aset LIKE '%$search%' OR a.lokasi LIKE '%$search%' OR ad.auditor LIKE '%$search%' OR ad.keterangan LIKE '%$search%')";
+    if ($kondisi !== '') $where[] = "ad.kondisi_fisik = '$kondisi'";
+    if ($kategoriFilter !== '') $where[] = "a.kategori_aset = '$kategoriFilter'";
+    if ($dari !== '') $where[] = "ad.tanggal_audit >= '$dari'";
+    if ($sampai !== '') $where[] = "ad.tanggal_audit <= '$sampai'";
 
     $whereSQL = count($where) ? 'WHERE ' . implode(' AND ', $where) : '';
 
-    // =======================
-    // STATISTIK
-    // =======================
-    $statQ = mysqli_query($koneksi, "
-    SELECT 
-    COUNT(*) as total_all,
-    SUM(kondisi_fisik='Baik') as total_baik,
-    SUM(kondisi_fisik='Rusak') as total_rusak,
-    SUM(kondisi_fisik='Perlu Perbaikan') as total_perbaikan
-    FROM audit_fisik
-    JOIN aset ON audit_fisik.id_aset = aset.id_aset
-    $whereSQL
-");
-    $stat = mysqli_fetch_assoc($statQ);
+    // MENGGUNAKAN JOIN (INNER JOIN) AGAR HANYA MENAMPILKAN ASET YANG MASIH ADA
+    $totalQ = mysqli_query($koneksi, "
+        SELECT COUNT(*) as total 
+        FROM audit_fisik ad
+        JOIN aset a ON ad.id_aset = a.id_aset
+        $whereSQL
+    ");
+    $totalRow = mysqli_fetch_assoc($totalQ)['total'];
 
-    // =======================
-    // DATA
-    // =======================
-    $countQ = mysqli_query($koneksi, "
-    SELECT COUNT(*) as total 
-    FROM audit_fisik
-    JOIN aset ON audit_fisik.id_aset = aset.id_aset
-    $whereSQL
-");
-    $totalRow = mysqli_fetch_assoc($countQ)['total'];
-
-    $offset = ($page - 1) * $perPage;
-
+    // MENGGUNAKAN JOIN (INNER JOIN) AGAR SINKRON DENGAN AUDIT_FISIK.PHP
     $dataQ = mysqli_query($koneksi, "
-    SELECT audit_fisik.*, aset.nama_aset, aset.lokasi
-    FROM audit_fisik
-    JOIN aset ON audit_fisik.id_aset = aset.id_aset
-    $whereSQL
-    ORDER BY audit_fisik.id_audit DESC
-    LIMIT $offset,$perPage
-");
+        SELECT ad.*, a.nama_aset, a.lokasi, a.kategori_aset
+        FROM audit_fisik ad
+        JOIN aset a ON ad.id_aset = a.id_aset
+        $whereSQL
+        ORDER BY ad.tanggal_audit DESC, ad.id_audit DESC
+        LIMIT $offset, $perPage
+    ");
     ?>
 
-    <!-- FILTER -->
     <div class="d-flex justify-content-between align-items-center mb-3">
         <form class="d-flex gap-2 filter-form" method="GET">
-            <input type="text" name="search" placeholder="Cari audit..." value="<?= htmlspecialchars($search); ?>">
-            <input type="date" name="dari" value="<?= $dari; ?>">
-            <input type="date" name="sampai" value="<?= $sampai; ?>">
-            <button class="btn btn-success btn-sm">🔍 Filter</button>
+            <input type="text" name="search" placeholder="Cari aset/auditor..." value="<?= htmlspecialchars($search) ?>">
+
+            <select name="kategori">
+                <option value="">Semua Kategori</option>
+                <option value="Medis" <?= $kategoriFilter == 'Medis' ? 'selected' : '' ?>>Medis</option>
+                <option value="Non-Medis" <?= $kategoriFilter == 'Non-Medis' ? 'selected' : '' ?>>Non-Medis</option>
+            </select>
+
+            <select name="kondisi">
+                <option value="">Semua Kondisi</option>
+                <option value="Baik" <?= $kondisi == 'Baik' ? 'selected' : '' ?>>Baik</option>
+                <option value="Perlu Perawatan" <?= $kondisi == 'Perlu Perawatan' ? 'selected' : '' ?>>Perlu Perawatan</option>
+                <option value="Rusak" <?= $kondisi == 'Rusak' ? 'selected' : '' ?>>Rusak</option>
+                <option value="Hilang" <?= $kondisi == 'Hilang' ? 'selected' : '' ?>>Hilang</option>
+            </select>
+
+            <input type="date" name="dari" value="<?= $dari ?>">
+            <input type="date" name="sampai" value="<?= $sampai ?>">
+            <button class="btn btn-success btn-sm" type="submit">🔍 Filter</button>
         </form>
 
         <div>
-            <a href="export_audit_excel.php?<?= http_build_query($_GET); ?>" class="btn btn-outline-primary btn-sm">📥 Excel</a>
-            <a href="cetak_laporan_audit.php?<?= http_build_query($_GET); ?>" class="btn btn-danger btn-sm" target="_blank">🖨 Cetak PDF</a>
+            <a href="cetak_laporan_audit.php?<?= http_build_query($_GET) ?>" class="btn btn-danger btn-sm" target="_blank">🖨 Cetak PDF</a>
         </div>
     </div>
 
-    <!-- STATISTIK -->
     <div class="stats mb-3">
-        <div class="stat">Total: <strong><?= intval($stat['total_all']); ?></strong></div>
-        <div class="stat">Baik: <strong><?= intval($stat['total_baik']); ?></strong></div>
-        <div class="stat">Rusak: <strong><?= intval($stat['total_rusak']); ?></strong></div>
-        <div class="stat">Perlu Perbaikan: <strong><?= intval($stat['total_perbaikan']); ?></strong></div>
+        <div class="stat">Total Riwayat Audit: <strong><?= intval($totalRow) ?></strong></div>
     </div>
 
-    <!-- TABEL -->
     <div class="card">
-        <div class="card-header">Data Audit Fisik</div>
+        <div class="card-header">Data Rekapitulasi Audit Fisik</div>
         <div class="card-body p-0">
-            <table class="table table-bordered table-hover mb-0">
-                <thead>
-                    <tr>
-                        <th>No</th>
-                        <th>Nama Aset</th>
-                        <th>Lokasi</th>
-                        <th>Tanggal Audit</th>
-                        <th>Kondisi</th>
-                        <th>Keterangan</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    if (mysqli_num_rows($dataQ) == 0) {
-                        echo '<tr><td colspan="6" class="text-center">Tidak ada data audit ditemukan</td></tr>';
-                    } else {
-                        $no = $offset + 1;
-                        while ($r = mysqli_fetch_assoc($dataQ)) {
-                            echo "<tr>
-                            <td>{$no}</td>
-                            <td>{$r['nama_aset']}</td>
-                            <td>{$r['lokasi']}</td>
-                            <td>{$r['tanggal_audit']}</td>
-                            <td>{$r['kondisi_fisik']}</td>
-                            <td>{$r['keterangan']} (Oleh: {$r['auditor']})</td>
-                        </tr>";
-                            $no++;
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover mb-0 text-center align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width:60px;">No</th>
+                            <th class="text-start">Nama Aset</th>
+                            <th>Kategori</th>
+                            <th>Lokasi Ruang</th>
+                            <th>Auditor</th>
+                            <th>Tanggal Audit</th>
+                            <th>Kondisi Fisik</th>
+                            <th class="text-start">Keterangan Tambahan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        if (mysqli_num_rows($dataQ) == 0) {
+                            echo '<tr><td colspan="8" class="text-center py-4">Tidak ada riwayat audit ditemukan</td></tr>';
+                        } else {
+                            $no = $offset + 1;
+                            while ($r = mysqli_fetch_assoc($dataQ)) {
+                                $kondisi_db = $r['kondisi_fisik'] ?? '';
+                                $badgeKondisi = '<span class="badge bg-secondary">' . htmlspecialchars($kondisi_db) . '</span>';
+                                if ($kondisi_db == 'Baik') $badgeKondisi = '<span class="badge bg-success">Baik</span>';
+                                elseif ($kondisi_db == 'Perlu Perawatan') $badgeKondisi = '<span class="badge bg-warning text-dark">Perlu Perawatan</span>';
+                                elseif ($kondisi_db == 'Rusak') $badgeKondisi = '<span class="badge bg-danger">Rusak</span>';
+                                elseif ($kondisi_db == 'Hilang') $badgeKondisi = '<span class="badge bg-dark">Hilang</span>';
+
+                                $nama_aset = htmlspecialchars($r['nama_aset'] ?? '-');
+                                $kategori  = htmlspecialchars($r['kategori_aset'] ?? '-');
+                                $lokasi    = htmlspecialchars($r['lokasi'] ?? '-');
+                                $auditor   = htmlspecialchars($r['auditor'] ?? '-');
+                                $tanggal   = htmlspecialchars($r['tanggal_audit'] ?? '-');
+                                $keterangan = htmlspecialchars($r['keterangan'] ?? '-');
+
+                                $badgeKategori = ($kategori == 'Medis') ? '<span class="badge bg-danger">Medis</span>' : '<span class="badge bg-primary">Non-Medis</span>';
+                                if ($kategori == '-') $badgeKategori = '-';
+
+                                echo "<tr>
+                                    <td>{$no}</td>
+                                    <td class='text-start fw-bold'>{$nama_aset}</td>
+                                    <td>{$badgeKategori}</td>
+                                    <td><i class='bi bi-geo-alt text-danger me-1'></i>{$lokasi}</td>
+                                    <td>{$auditor}</td>
+                                    <td>" . date('d-m-Y', strtotime($tanggal)) . "</td>
+                                    <td>{$badgeKondisi}</td>
+                                    <td class='text-start'>{$keterangan}</td>
+                                </tr>";
+                                $no++;
+                            }
                         }
-                    }
-                    ?>
-                </tbody>
-            </table>
+                        ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
-    <!-- PAGINATION -->
     <?php
     $totalPages = ceil($totalRow / $perPage);
     if ($totalPages > 1) {
-        echo '<nav style="margin-top:12px;"><ul class="pagination">';
+        echo '<nav aria-label="Page navigation" style="margin-top:12px;"><ul class="pagination">';
         $queryParams = $_GET;
         for ($p = 1; $p <= $totalPages; $p++) {
             $queryParams['page'] = $p;
-            $url = 'laporan_audit.php?' . http_build_query($queryParams);
+            $url = 'Laporan_audit.php?' . http_build_query($queryParams);
             $active = $p == $page ? 'active' : '';
             echo "<li class='page-item $active'><a class='page-link' href='$url'>$p</a></li>";
         }
         echo '</ul></nav>';
     }
     ?>
-
 </div>
 
 <?php include(__DIR__ . '/../footer.php'); ?>

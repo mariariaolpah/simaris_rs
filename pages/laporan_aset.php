@@ -7,6 +7,12 @@ if (!isset($_SESSION['id_pengguna'])) {
 
 include(__DIR__ . '/../config/koneksi.php');
 include(__DIR__ . '/../header.php');
+
+function formatTanggal($tanggal)
+{
+    if (!$tanggal || $tanggal == '0000-00-00') return '-';
+    return date('d-m-Y', strtotime($tanggal));
+}
 ?>
 
 <style>
@@ -35,6 +41,30 @@ include(__DIR__ . '/../header.php');
         border-radius: 8px;
         box-shadow: 0 1px 4px rgba(0, 0, 0, .05);
     }
+
+    .table th {
+        font-size: 0.85rem;
+    }
+
+    .table td {
+        font-size: 0.85rem;
+        vertical-align: middle;
+    }
+
+    /* Tambahan style untuk thumbnail foto */
+    .foto-thumbnail {
+        width: 45px;
+        height: 45px;
+        object-fit: cover;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+        transition: transform 0.2s;
+    }
+
+    .foto-thumbnail:hover {
+        transform: scale(1.1);
+        cursor: pointer;
+    }
 </style>
 
 <div class="dashboard-header">
@@ -43,31 +73,32 @@ include(__DIR__ . '/../header.php');
 
 <div class="content">
     <?php
-    // ambil parameter filter
     $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
     $perPage = 10;
-    $search = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
+
+    $search  = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
     $kondisi = isset($_GET['kondisi']) ? mysqli_real_escape_string($koneksi, $_GET['kondisi']) : '';
-    $dari = isset($_GET['dari']) ? mysqli_real_escape_string($koneksi, $_GET['dari']) : '';
-    $sampai = isset($_GET['sampai']) ? mysqli_real_escape_string($koneksi, $_GET['sampai']) : '';
+    $dari    = isset($_GET['dari']) ? mysqli_real_escape_string($koneksi, $_GET['dari']) : '';
+    $sampai  = isset($_GET['sampai']) ? mysqli_real_escape_string($koneksi, $_GET['sampai']) : '';
 
     $where = [];
-    if ($search !== '') $where[] = "(nama_aset LIKE '%$search%' OR jenis LIKE '%$search%' OR tipe_aset LIKE '%$search%' OR lokasi LIKE '%$search%')";
-    if ($kondisi !== '') $where[] = "kondisi = '$kondisi'";
-    if ($dari !== '') $where[] = "tanggal_masuk >= '$dari'";
-    if ($sampai !== '') $where[] = "tanggal_masuk <= '$sampai'";
+    if ($search !== '')   $where[] = "(nama_aset LIKE '%$search%' OR jenis LIKE '%$search%' OR tipe_aset LIKE '%$search%' OR lokasi LIKE '%$search%')";
+    if ($kondisi !== '')  $where[] = "kondisi = '$kondisi'";
+    if ($dari !== '')     $where[] = "tanggal_masuk >= '$dari'";
+    if ($sampai !== '')   $where[] = "tanggal_masuk <= '$sampai'";
+
     $whereSQL = count($where) ? 'WHERE ' . implode(' AND ', $where) : '';
 
-    // statistik kondisi
-    $statQ = mysqli_query($koneksi, "SELECT 
-        COUNT(*) as total_all,
-        SUM(kondisi='Baik') as total_baik,
-        SUM(kondisi='Rusak') as total_rusak,
-        SUM(kondisi='Perlu Perawatan') as total_perawatan
-        FROM aset $whereSQL");
+    $statQ = mysqli_query($koneksi, "
+        SELECT 
+            COUNT(*) as total_all,
+            SUM(kondisi='Baik') as total_baik,
+            SUM(kondisi='Perlu Perawatan') as total_perawatan,
+            SUM(kondisi='Rusak') as total_rusak
+        FROM aset $whereSQL
+    ");
     $stat = mysqli_fetch_assoc($statQ);
 
-    // ambil data aset
     $countQ = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM aset $whereSQL");
     $totalRow = mysqli_fetch_assoc($countQ)['total'];
     $offset = ($page - 1) * $perPage;
@@ -77,74 +108,110 @@ include(__DIR__ . '/../header.php');
 
     <div class="d-flex justify-content-between align-items-center mb-3">
         <form class="d-flex gap-2 filter-form" method="GET" action="">
-            <input type="text" name="search" placeholder="Cari aset..." value="<?php echo htmlspecialchars($search); ?>">
+            <input type="text" name="search" placeholder="Cari nomor/nama/lokasi..." value="<?= htmlspecialchars($search); ?>">
             <select name="kondisi">
                 <option value="">Semua Kondisi</option>
-                <option value="Baik" <?php if ($kondisi == 'Baik') echo 'selected'; ?>>Baik</option>
-                <option value="Rusak" <?php if ($kondisi == 'Rusak') echo 'selected'; ?>>Rusak</option>
-                <option value="Perlu Perawatan" <?php if ($kondisi == 'Perlu Perawatan') echo 'selected'; ?>>Perlu Perawatan</option>
+                <option value="Baik" <?= ($kondisi == 'Baik') ? 'selected' : ''; ?>>Baik</option>
+                <option value="Perlu Perawatan" <?= ($kondisi == 'Perlu Perawatan') ? 'selected' : ''; ?>>Perlu Perawatan</option>
+                <option value="Rusak" <?= ($kondisi == 'Rusak') ? 'selected' : ''; ?>>Rusak</option>
             </select>
-            <input type="date" name="dari" value="<?php echo $dari; ?>">
-            <input type="date" name="sampai" value="<?php echo $sampai; ?>">
+            <input type="date" name="dari" value="<?= $dari; ?>">
+            <input type="date" name="sampai" value="<?= $sampai; ?>">
             <button class="btn btn-success btn-sm" type="submit">🔍 Filter</button>
         </form>
 
         <div>
-            <a href="export_aset_excel.php?<?php echo http_build_query($_GET); ?>" class="btn btn-outline-primary btn-sm">📥 Excel</a>
-            <a href="cetak_laporan_aset.php?<?php echo http_build_query($_GET); ?>" class="btn btn-danger btn-sm" target="_blank">🖨 Cetak PDF</a>
+            <a href="export_aset_excel.php?<?= http_build_query($_GET); ?>" class="btn btn-outline-primary btn-sm">📥 Excel</a>
+            <a href="cetak_laporan_aset.php?<?= http_build_query($_GET); ?>" class="btn btn-danger btn-sm" target="_blank">🖨 Cetak PDF</a>
         </div>
     </div>
 
-    <!-- Statistik ringkas -->
     <div class="stats mb-3">
-        <div class="stat">Total: <strong><?php echo intval($stat['total_all']); ?></strong></div>
-        <div class="stat">Baik: <strong><?php echo intval($stat['total_baik']); ?></strong></div>
-        <div class="stat">Rusak: <strong><?php echo intval($stat['total_rusak']); ?></strong></div>
-        <div class="stat">Perlu Perawatan: <strong><?php echo intval($stat['total_perawatan']); ?></strong></div>
+        <div class="stat">Total Item: <strong><?= intval($stat['total_all']); ?></strong></div>
+        <div class="stat text-success">Kondisi Baik: <strong><?= intval($stat['total_baik']); ?></strong></div>
+        <div class="stat text-warning">Perlu Rawat: <strong><?= intval($stat['total_perawatan']); ?></strong></div>
+        <div class="stat text-danger">Rusak: <strong><?= intval($stat['total_rusak']); ?></strong></div>
     </div>
 
-    <!-- Tabel -->
     <div class="card">
-        <div class="card-header">Data Aset Rumah Sakit</div>
+        <div class="card-header">Rekapitulasi Inventaris Utama</div>
         <div class="card-body p-0">
-            <table class="table table-bordered table-hover mb-0">
-                <thead>
-                    <tr>
-                        <th style="width:60px;">No</th>
-                        <th>Nama Aset</th>
-                        <th>Jenis</th>
-                        <th>Tipe Aset</th>
-                        <th>Lokasi</th>
-                        <th>Kondisi</th>
-                        <th>Tanggal Masuk</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    if (mysqli_num_rows($dataQ) == 0) {
-                        echo '<tr><td colspan="7" class="text-center">Tidak ada data aset ditemukan</td></tr>';
-                    } else {
-                        $no = $offset + 1;
-                        while ($r = mysqli_fetch_assoc($dataQ)) {
-                            echo "<tr>
-                                <td>{$no}</td>
-                                <td>{$r['nama_aset']}</td>
-                                <td>{$r['jenis']}</td>
-                                <td>{$r['tipe_aset']}</td>
-                                <td>{$r['lokasi']}</td>
-                                <td>{$r['kondisi']}</td>
-                                <td>{$r['tanggal_masuk']}</td>
-                            </tr>";
-                            $no++;
-                        }
-                    }
-                    ?>
-                </tbody>
-            </table>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover mb-0 text-center align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width:40px;">No</th>
+                            <th class="text-start">Nama Aset</th>
+                            <th>Kategori</th>
+                            <th>Jenis</th>
+                            <th>Tipe</th>
+                            <th>Lokasi Ruangan</th>
+                            <th>Kondisi</th>
+                            <th>Asal Usul</th>
+                            <th>Harga Perolehan</th>
+                            <th>Umur Eko.</th>
+                            <th>Tanggal Masuk</th>
+                            <th>Foto Fisik</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (mysqli_num_rows($dataQ) == 0): ?>
+                            <tr>
+                                <td colspan="12" class="text-center py-4">Data komponen aset tidak ditemukan atau kosong.</td>
+                            </tr>
+                        <?php else: ?>
+                            <?php $no = $offset + 1;
+                            while ($a = mysqli_fetch_assoc($dataQ)): ?>
+                                <tr>
+                                    <td><?= $no++; ?></td>
+                                    <td class="text-start fw-bold"><?= htmlspecialchars($a['nama_aset']); ?></td>
+                                    <td>
+                                        <?php if (isset($a['kategori_aset']) && $a['kategori_aset'] == 'Medis'): ?>
+                                            <span class="badge bg-danger">Medis</span>
+                                        <?php elseif (isset($a['kategori_aset']) && $a['kategori_aset'] == 'Non-Medis'): ?>
+                                            <span class="badge bg-primary">Non-Medis</span>
+                                        <?php else: ?>
+                                            -
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?= htmlspecialchars($a['jenis']); ?></td>
+                                    <td><?= htmlspecialchars($a['tipe_aset']); ?></td>
+                                    <td class="text-start"><i class="bi bi-geo-alt text-danger me-1"></i><?= htmlspecialchars($a['lokasi']); ?></td>
+                                    <td>
+                                        <?php
+                                        $bg = 'text-success';
+                                        if ($a['kondisi'] == 'Perlu Perawatan') $bg = 'text-warning';
+                                        if ($a['kondisi'] == 'Rusak') $bg = 'text-danger';
+                                        ?>
+                                        <span class="fw-bold <?= $bg; ?>"><?= $a['kondisi']; ?></span>
+                                    </td>
+                                    <td><?= htmlspecialchars($a['asal_usul']); ?></td>
+                                    <td class="text-end fw-bold">Rp <?= number_format($a['harga'], 0, ',', '.') ?></td>
+                                    <td class="text-success fw-bold"><?= ($a['umur_ekonomis'] > 0) ? $a['umur_ekonomis'] . ' Thn' : '-' ?></td>
+                                    <td><?= formatTanggal($a['tanggal_masuk']); ?></td>
+
+                                    <td>
+                                        <?php
+                                        $imgPath = __DIR__ . '/../assets/dokumen/' . $a['dokumen'];
+                                        if (!empty($a['dokumen']) && file_exists($imgPath)):
+                                        ?>
+                                            <a href="../assets/dokumen/<?= htmlspecialchars($a['dokumen']) ?>" target="_blank" title="Klik untuk memperbesar">
+                                                <img src="../assets/dokumen/<?= htmlspecialchars($a['dokumen']) ?>" class="foto-thumbnail" alt="Foto Aset">
+                                            </a>
+                                        <?php else: ?>
+                                            <span class="text-muted" style="font-size: 0.75rem;">Tidak Ada</span>
+                                        <?php endif; ?>
+                                    </td>
+
+                                </tr>
+                            <?php endwhile; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
-    <!-- Pagination -->
     <?php
     $totalPages = ceil($totalRow / $perPage);
     if ($totalPages > 1) {

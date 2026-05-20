@@ -7,8 +7,7 @@ if (!isset($_SESSION['id_pengguna'])) {
 
 include(__DIR__ . '/../config/koneksi.php');
 
-// Pengecekan Role (Misal session kamu namanya 'level' atau 'role')
-// Sesuaikan kata 'level' di bawah ini dengan nama session yang kamu buat di manajemen akun
+// Pengecekan Role
 $role_pengguna = isset($_SESSION['level']) ? strtolower($_SESSION['level']) : 'user';
 $is_admin = ($role_pengguna == 'admin');
 
@@ -22,23 +21,31 @@ if (isset($_POST['simpan'])) {
     $keterangan  = mysqli_real_escape_string($koneksi, $_POST['keterangan']);
     $pelapor     = mysqli_real_escape_string($koneksi, $_POST['pelapor']);
 
+    // Logika pengisian teknisi: Jika admin, ambil dari form. Jika user, otomatis '-'
+    $teknisi = '-';
+    if ($is_admin && isset($_POST['teknisi']) && trim($_POST['teknisi']) !== '') {
+        $teknisi = mysqli_real_escape_string($koneksi, $_POST['teknisi']);
+    }
+
     // Ambil nama_aset berdasarkan id_aset pilihan user
     $aset_find  = mysqli_query($koneksi, "SELECT nama_aset FROM aset WHERE id_aset=$id_aset LIMIT 1");
     $aset_row   = mysqli_fetch_assoc($aset_find);
     $nama_aset  = $aset_row['nama_aset'];
 
-    // Simpan data ke tabel kerusakan
-    $insert = mysqli_query($koneksi, "INSERT INTO kerusakan (nama_aset, status, tanggal, keterangan, pelapor) 
-                            VALUES ('$nama_aset','$status','$tanggal','$keterangan', '$pelapor')");
+    // Simpan data ke tabel kerusakan (Termasuk kolom teknisi)
+    $insert = mysqli_query($koneksi, "INSERT INTO kerusakan (nama_aset, status, tanggal, keterangan, pelapor, teknisi) 
+                            VALUES ('$nama_aset','$status','$tanggal','$keterangan', '$pelapor', '$teknisi')");
 
     // Mengupdate langsung kondisi fisik aset utama di master data
-    if ($status == "Rusak") {
-        mysqli_query($koneksi, "UPDATE aset SET kondisi = 'Rusak' WHERE id_aset = $id_aset");
-    } elseif ($status == "Perlu Perawatan" || $status == "Dalam Perbaikan") {
-        mysqli_query($koneksi, "UPDATE aset SET kondisi = 'Perlu Perawatan' WHERE id_aset = $id_aset");
-    }
-
     if ($insert) {
+        if ($status == "Rusak") {
+            mysqli_query($koneksi, "UPDATE aset SET kondisi = 'Rusak' WHERE id_aset = $id_aset");
+        } elseif ($status == "Perlu Perawatan" || $status == "Dalam Perbaikan") {
+            mysqli_query($koneksi, "UPDATE aset SET kondisi = 'Perlu Perawatan' WHERE id_aset = $id_aset");
+        } elseif ($status == "Selesai Diperbaiki") {
+            mysqli_query($koneksi, "UPDATE aset SET kondisi = 'Baik' WHERE id_aset = $id_aset");
+        }
+
         echo "<script>alert('Laporan kerusakan aset berhasil dicatat!');window.location='kerusakan.php';</script>";
     } else {
         echo "<script>alert('Gagal menyimpan laporan kerusakan!');</script>";
@@ -187,6 +194,14 @@ if (isset($_POST['simpan'])) {
                                 <?php endif; ?>
                             </div>
 
+                            <?php if ($is_admin): ?>
+                                <div class="mb-4">
+                                    <label class="form-label">Langsung Tugaskan Teknisi (Opsional)</label>
+                                    <input type="text" name="teknisi" class="form-control" placeholder="Ketik nama teknisi di sini...">
+                                    <div class="form-text text-success"><i class="bi bi-check-circle"></i> Fitur khusus Admin: Anda dapat langsung mengisi penanggung jawab perbaikan.</div>
+                                </div>
+                            <?php endif; ?>
+
                             <div class="highlight-danger">
                                 <h6 class="fw-bold text-danger mb-1"><i class="bi bi-shield-fill-exclamation"></i> Peringatan Respon Cepat RS</h6>
                                 <small class="text-secondary d-block">Pelaporan kerusakan pada **Aset Medis (Alkes Vital)** akan langsung merubah status kondisi inventaris utama menjadi tidak operasional demi mencegah malpraktik medis.</small>
@@ -194,12 +209,16 @@ if (isset($_POST['simpan'])) {
 
                             <div class="row">
                                 <div class="col-md-6 mb-4">
-                                    <label class="form-label">Status Kondisi Awal Laporan</label>
+                                    <label class="form-label">Status Kondisi Laporan</label>
                                     <select name="status" class="form-select" required>
-                                        <option value="">-- Pilih Tindakan Awal --</option>
+                                        <option value="">-- Pilih Tindakan --</option>
                                         <option value="Rusak">Rusak (Mati Total / Berat)</option>
                                         <option value="Perlu Perawatan">Perlu Perawatan / Malfungsi Ringan</option>
-                                        <option value="Dalam Perbaikan">Dalam Perbaikan (Sedang Ditangani)</option>
+
+                                        <?php if ($is_admin): ?>
+                                            <option value="Dalam Perbaikan">Dalam Perbaikan (Sedang Ditangani)</option>
+                                            <option value="Selesai Diperbaiki">Selesai Diperbaiki</option>
+                                        <?php endif; ?>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-4">

@@ -15,23 +15,33 @@ if (isset($_SESSION['level']) && strtolower(trim($_SESSION['level'])) == 'admin'
 
 include(__DIR__ . '/../config/koneksi.php');
 
-$aset = mysqli_query($koneksi, "SELECT * FROM aset");
+// Ambil data aset lengkap dengan lokasi ruangan
+$aset = mysqli_query($koneksi, "SELECT * FROM aset ORDER BY nama_aset ASC");
 
 if (isset($_POST['simpan'])) {
-    $nama_aset = $_POST['nama_aset'];
-    $tanggal = date('Y-m-d');
-    $status = $_POST['status'];
-    $keterangan = $_POST['keterangan'];
+    // Ambil input dan amankan dengan mysqli_real_escape_string
+    $nama_aset  = mysqli_real_escape_string($koneksi, $_POST['nama_aset']);
+    $status     = mysqli_real_escape_string($koneksi, $_POST['status']);
+    $keterangan = mysqli_real_escape_string($koneksi, $_POST['keterangan']);
 
+    $tanggal    = date('Y-m-d');
+
+    // Ambil nama pelapor dari session user yang sedang login
+    $pelapor    = mysqli_real_escape_string($koneksi, $_SESSION['nama_pengguna']);
+
+    // Set sumber pelaporan otomatis menjadi App User
+    $sumber     = 'App User';
+
+    // Tambahkan pelapor dan sumber ke dalam query insert
     $query = mysqli_query($koneksi, "
-        INSERT INTO kerusakan (nama_aset, tanggal, status, keterangan) 
-        VALUES ('$nama_aset', '$tanggal', '$status', '$keterangan')
+        INSERT INTO kerusakan (nama_aset, tanggal, status, keterangan, pelapor, sumber) 
+        VALUES ('$nama_aset', '$tanggal', '$status', '$keterangan', '$pelapor', '$sumber')
     ");
 
     if ($query) {
         echo "<script>alert('Laporan berhasil dikirim!'); window.location='user_data_kerusakan.php';</script>";
     } else {
-        echo "<script>alert('Gagal menambahkan laporan');</script>";
+        echo "<script>alert('Gagal menambahkan laporan!');</script>";
     }
 }
 ?>
@@ -104,38 +114,52 @@ if (isset($_POST['simpan'])) {
 
                 <div class="card-body">
                     <form method="POST">
+
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Nama Aset</label>
-                            <select name="nama_aset" class="form-control" required>
+                            <label class="form-label fw-bold">Nama Pelapor</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-person-circle"></i></span>
+                                <input type="text" class="form-control bg-light border-start-0" value="<?= htmlspecialchars($_SESSION['nama_pengguna'] ?? 'User'); ?>" readonly>
+                            </div>
+                            <div class="form-text text-muted"><i class="bi bi-info-circle"></i> Nama pelapor otomatis disesuaikan dengan akun Anda.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Pilih Aset / Alat yang Bermasalah</label>
+                            <select name="nama_aset" class="form-select" required>
                                 <option value="">-- Pilih Aset --</option>
                                 <?php while ($row = mysqli_fetch_assoc($aset)) : ?>
-                                    <option value="<?= $row['nama_aset']; ?>"><?= $row['nama_aset']; ?></option>
+                                    <option value="<?= htmlspecialchars($row['nama_aset']); ?>">
+                                        <?= htmlspecialchars($row['nama_aset']); ?> — [ 📍 Ruang: <?= htmlspecialchars($row['lokasi'] ?? '-'); ?> ]
+                                    </option>
                                 <?php endwhile; ?>
                             </select>
+                            <div class="form-text text-muted"><i class="bi bi-geo-alt"></i> Perhatikan ruangan lokasi alat agar tidak salah melapor.</div>
                         </div>
 
                         <div class="mb-3">
                             <label class="form-label fw-bold">Status Kerusakan</label>
-                            <select name="status" class="form-control" required>
-                                <option value="Rusak">Rusak</option>
-                                <option value="Perlu Perawatan">Perlu Perawatan</option>
+                            <select name="status" class="form-select" required>
+                                <option value="Rusak">Rusak (Mati Total / Berat)</option>
+                                <option value="Perlu Perawatan">Perlu Perawatan (Malfungsi Ringan)</option>
                                 <option value="Dalam Perbaikan">Dalam Perbaikan</option>
                             </select>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Keterangan</label>
-                            <textarea name="keterangan" class="form-control" required></textarea>
+                            <label class="form-label fw-bold">Keterangan / Rincian Kerusakan</label>
+                            <textarea name="keterangan" class="form-control" rows="4" placeholder="Jelaskan detail kerusakan alat secara singkat..." required></textarea>
                         </div>
 
-                        <div class="d-flex justify-content-end gap-2 mt-3">
+                        <div class="d-flex justify-content-end gap-2 mt-4">
                             <a href="user_data_kerusakan.php" class="btn btn-secondary px-4">
                                 <i class="bi bi-x-circle"></i> Batal
                             </a>
                             <button type="submit" name="simpan" class="btn btn-success px-4">
-                                <i class="bi bi-send"></i> Kirim
+                                <i class="bi bi-send"></i> Kirim Laporan
                             </button>
                         </div>
+
                     </form>
                 </div>
             </div>

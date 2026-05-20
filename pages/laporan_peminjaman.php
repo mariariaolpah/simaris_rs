@@ -38,7 +38,7 @@ include(__DIR__ . '/../header.php');
 </style>
 
 <div class="dashboard-header">
-    <h3 class="mb-0">Laporan Peminjaman Aset</h3>
+    <h3 class="mb-0">Laporan Rekapitulasi Peminjaman Aset</h3>
 </div>
 
 <div class="content">
@@ -55,67 +55,58 @@ include(__DIR__ . '/../header.php');
     $where = [];
 
     if ($search !== '') {
-        $where[] = "(nama_peminjam LIKE '%$search%' OR aset.nama_aset LIKE '%$search%')";
+        $where[] = "(peminjaman.nama_peminjam LIKE '%$search%' OR aset.nama_aset LIKE '%$search%' OR aset.lokasi LIKE '%$search%')";
     }
     if ($status !== '') {
-        $where[] = "status_pinjam = '$status'";
+        $where[] = "peminjaman.status_pinjam = '$status'";
     }
-    if ($dari !== '') $where[] = "tanggal_pinjam >= '$dari'";
-    if ($sampai !== '') $where[] = "tanggal_pinjam <= '$sampai'";
+    if ($dari !== '') $where[] = "peminjaman.tanggal_pinjam >= '$dari'";
+    if ($sampai !== '') $where[] = "peminjaman.tanggal_pinjam <= '$sampai'";
 
     $whereSQL = count($where) ? 'WHERE ' . implode(' AND ', $where) : '';
 
-    // =======================
-    // STATISTIK
-    // =======================
+    // ======================= STATISTIK =======================
     $statQ = mysqli_query($koneksi, "
-    SELECT 
-    COUNT(*) as total_all,
-    SUM(status_pinjam='Dipinjam') as dipinjam,
-    SUM(status_pinjam='Dikembalikan') as kembali
-    FROM peminjaman
-    JOIN aset ON peminjaman.id_aset = aset.id_aset
-    $whereSQL
-");
+        SELECT 
+        COUNT(*) as total_all,
+        SUM(status_pinjam='Dipinjam') as dipinjam,
+        SUM(status_pinjam='Dikembalikan') as kembali
+        FROM peminjaman
+        JOIN aset ON peminjaman.id_aset = aset.id_aset
+        $whereSQL
+    ");
     $stat = mysqli_fetch_assoc($statQ);
 
-    // =======================
-    // DATA
-    // =======================
+    // ======================= DATA =======================
     $countQ = mysqli_query($koneksi, "
-    SELECT COUNT(*) as total 
-    FROM peminjaman
-    JOIN aset ON peminjaman.id_aset = aset.id_aset
-    $whereSQL
-");
+        SELECT COUNT(*) as total 
+        FROM peminjaman
+        JOIN aset ON peminjaman.id_aset = aset.id_aset
+        $whereSQL
+    ");
     $totalRow = mysqli_fetch_assoc($countQ)['total'];
-
     $offset = ($page - 1) * $perPage;
 
     $dataQ = mysqli_query($koneksi, "
-    SELECT peminjaman.*, aset.nama_aset, aset.jenis
-    FROM peminjaman
-    JOIN aset ON peminjaman.id_aset = aset.id_aset
-    $whereSQL
-    ORDER BY peminjaman.id_pinjam DESC
-    LIMIT $offset,$perPage
-");
+        SELECT peminjaman.*, aset.nama_aset, aset.kategori_aset, aset.lokasi
+        FROM peminjaman
+        JOIN aset ON peminjaman.id_aset = aset.id_aset
+        $whereSQL
+        ORDER BY peminjaman.id_pinjam DESC
+        LIMIT $offset,$perPage
+    ");
     ?>
 
-    <!-- FILTER -->
     <div class="d-flex justify-content-between align-items-center mb-3">
         <form class="d-flex gap-2 filter-form" method="GET">
             <input type="text" name="search" placeholder="Cari peminjaman..." value="<?= htmlspecialchars($search); ?>">
-
             <select name="status">
                 <option value="">Semua Status</option>
                 <option value="Dipinjam" <?= $status == 'Dipinjam' ? 'selected' : '' ?>>Dipinjam</option>
                 <option value="Dikembalikan" <?= $status == 'Dikembalikan' ? 'selected' : '' ?>>Dikembalikan</option>
             </select>
-
             <input type="date" name="dari" value="<?= $dari; ?>">
             <input type="date" name="sampai" value="<?= $sampai; ?>">
-
             <button class="btn btn-success btn-sm">🔍 Filter</button>
         </form>
 
@@ -125,55 +116,67 @@ include(__DIR__ . '/../header.php');
         </div>
     </div>
 
-    <!-- STATISTIK -->
     <div class="stats mb-3">
         <div class="stat">Total: <strong><?= intval($stat['total_all']); ?></strong></div>
-        <div class="stat">Dipinjam: <strong><?= intval($stat['dipinjam']); ?></strong></div>
-        <div class="stat">Dikembalikan: <strong><?= intval($stat['kembali']); ?></strong></div>
+        <div class="stat text-warning">Sedang Dipinjam: <strong><?= intval($stat['dipinjam']); ?></strong></div>
+        <div class="stat text-success">Telah Dikembalikan: <strong><?= intval($stat['kembali']); ?></strong></div>
     </div>
 
-    <!-- TABEL -->
     <div class="card">
         <div class="card-header">Data Peminjaman Aset</div>
         <div class="card-body p-0">
-            <table class="table table-bordered table-hover mb-0">
+            <table class="table table-bordered table-hover mb-0 text-center align-middle">
                 <thead>
                     <tr>
-                        <th>No</th>
-                        <th>Nama Peminjam</th>
-                        <th>Nama Aset</th>
-                        <th>Jenis</th>
-                        <th>Tanggal Pinjam</th>
-                        <th>Tanggal Kembali</th>
+                        <th style="width:50px;">No</th>
+                        <th class="text-start">Peminjam</th>
+                        <th class="text-start">Nama Alat</th>
+                        <th>Kategori</th>
+                        <th>Lokasi Asal</th>
+                        <th>Tgl Pinjam</th>
+                        <th>Tgl Kembali</th>
                         <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php
-                    if (mysqli_num_rows($dataQ) == 0) {
-                        echo '<tr><td colspan="7" class="text-center">Tidak ada data</td></tr>';
-                    } else {
-                        $no = $offset + 1;
-                        while ($r = mysqli_fetch_assoc($dataQ)) {
-                            echo "<tr>
-                            <td>{$no}</td>
-                            <td>{$r['nama_peminjam']}</td>
-                            <td>{$r['nama_aset']}</td>
-                            <td>{$r['jenis']}</td>
-                            <td>{$r['tanggal_pinjam']}</td>
-                            <td>" . ($r['tanggal_kembali'] ?: '-') . "</td>
-                            <td>{$r['status_pinjam']}</td>
-                        </tr>";
-                            $no++;
-                        }
-                    }
-                    ?>
+                    <?php if (mysqli_num_rows($dataQ) == 0): ?>
+                        <tr>
+                            <td colspan="8" class="text-center py-4">Tidak ada data peminjaman</td>
+                        </tr>
+                    <?php else: ?>
+                        <?php $no = $offset + 1;
+                        while ($r = mysqli_fetch_assoc($dataQ)): ?>
+                            <tr>
+                                <td><?= $no++; ?></td>
+                                <td class="text-start">
+                                    <div class="fw-bold"><?= htmlspecialchars($r['nama_peminjam']); ?></div>
+                                    <?php if (isset($r['sumber']) && $r['sumber'] == 'App User'): ?>
+                                        <span class="badge bg-primary mt-1" style="font-size:0.65rem;">[ App User ]</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-secondary mt-1" style="font-size:0.65rem;">[ Admin ]</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="text-start fw-bold"><?= htmlspecialchars($r['nama_aset']); ?></td>
+                                <td><?= htmlspecialchars($r['kategori_aset']); ?></td>
+                                <td><i class="bi bi-geo-alt text-danger me-1"></i><?= htmlspecialchars($r['lokasi']); ?></td>
+                                <td><?= !empty($r['tanggal_pinjam']) ? date('d/m/Y', strtotime($r['tanggal_pinjam'])) : '-'; ?></td>
+                                <td><?= (!empty($r['tanggal_kembali']) && $r['tanggal_kembali'] != '0000-00-00') ? date('d/m/Y', strtotime($r['tanggal_kembali'])) : '-'; ?></td>
+                                <td>
+                                    <?php
+                                    $bg = 'bg-secondary';
+                                    if ($r['status_pinjam'] == 'Dipinjam') $bg = 'bg-warning text-dark';
+                                    if ($r['status_pinjam'] == 'Dikembalikan') $bg = 'bg-success';
+                                    ?>
+                                    <span class="badge <?= $bg; ?>"><?= htmlspecialchars($r['status_pinjam']); ?></span>
+                                </td>
+                            </tr>
+                        <?php endwhile; ?>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
     </div>
 
-    <!-- PAGINATION -->
     <?php
     $totalPages = ceil($totalRow / $perPage);
     if ($totalPages > 1) {
@@ -188,7 +191,6 @@ include(__DIR__ . '/../header.php');
         echo '</ul></nav>';
     }
     ?>
-
 </div>
 
 <?php include(__DIR__ . '/../footer.php'); ?>
