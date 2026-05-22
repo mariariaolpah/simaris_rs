@@ -35,6 +35,16 @@ include(__DIR__ . '/../header.php');
         border-radius: 8px;
         box-shadow: 0 1px 4px rgba(0, 0, 0, .05);
     }
+
+    .img-kerusakan {
+        width: 55px;
+        height: 55px;
+        object-fit: cover;
+        border-radius: 6px;
+        border: 1px solid #cbd5e1;
+        padding: 2px;
+        background-color: #fff;
+    }
 </style>
 
 <div class="dashboard-header">
@@ -128,13 +138,14 @@ include(__DIR__ . '/../header.php');
                             <th>Auditor</th>
                             <th>Tanggal Audit</th>
                             <th>Kondisi Fisik</th>
+                            <th>Bukti Fisik</th>
                             <th class="text-start">Keterangan Tambahan</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php
                         if (mysqli_num_rows($dataQ) == 0) {
-                            echo '<tr><td colspan="8" class="text-center py-4">Tidak ada riwayat audit ditemukan</td></tr>';
+                            echo '<tr><td colspan="9" class="text-center py-4">Tidak ada riwayat audit ditemukan</td></tr>';
                         } else {
                             $no = $offset + 1;
                             while ($r = mysqli_fetch_assoc($dataQ)) {
@@ -152,6 +163,9 @@ include(__DIR__ . '/../header.php');
                                 $tanggal   = htmlspecialchars($r['tanggal_audit'] ?? '-');
                                 $keterangan = htmlspecialchars($r['keterangan'] ?? '-');
 
+                                $gambar = $r['gambar_rusak'] ?? '';
+                                $td_gambar = !empty($gambar) ? '<img src="../assets/img/' . htmlspecialchars($gambar) . '" class="img-kerusakan">' : '<span class="text-muted">-</span>';
+
                                 $badgeKategori = ($kategori == 'Medis') ? '<span class="badge bg-danger">Medis</span>' : '<span class="badge bg-primary">Non-Medis</span>';
                                 if ($kategori == '-') $badgeKategori = '-';
 
@@ -163,6 +177,7 @@ include(__DIR__ . '/../header.php');
                                     <td>{$auditor}</td>
                                     <td>" . date('d-m-Y', strtotime($tanggal)) . "</td>
                                     <td>{$badgeKondisi}</td>
+                                    <td>{$td_gambar}</td>
                                     <td class='text-start'>{$keterangan}</td>
                                 </tr>";
                                 $no++;

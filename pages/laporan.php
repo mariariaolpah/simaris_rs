@@ -10,81 +10,89 @@ include(__DIR__ . '/../config/koneksi.php');
 $tahun_filter = isset($_GET['tahun']) ? (int)$_GET['tahun'] : "";
 
 // =======================
-// FUNGSI HITUNG DATA
+// FUNGSI HITUNG DATA (FINAL)
 // =======================
 function getCount($koneksi, $jenis, $tahun)
 {
     $table = '';
+    $join = '';
     $where = [];
+    $col_date = '';
 
     switch ($jenis) {
         case 'aset':
             $table = 'aset';
+            $col_date = 'tanggal_masuk';
             break;
         case 'kerusakan':
             $table = 'kerusakan';
+            $col_date = 'tanggal';
             break;
         case 'perawatan':
             $table = 'perawatan';
+            $col_date = 'tanggal';
             break;
         case 'perbaikan':
             $table = 'kerusakan';
             $where[] = "status IN ('Dalam Perbaikan','Selesai Diperbaiki')";
+            $col_date = 'tanggal';
             break;
         case 'perawatan_berjalan':
             $table = 'perawatan';
             $where[] = "status IN ('Belum Dimulai','Sedang Proses')";
+            $col_date = 'tanggal';
             break;
         case 'peminjaman':
             $table = 'peminjaman';
+            // PENTING: Gunakan JOIN agar hanya menghitung peminjaman dari aset yang masih ada
+            $join = 'JOIN aset ON peminjaman.id_aset = aset.id_aset';
+            $col_date = 'peminjaman.tanggal_pinjam';
             break;
         case 'audit_fisik':
             $table = 'audit_fisik';
+            // PENTING: Gunakan JOIN agar hanya menghitung audit dari aset yang masih ada
+            $join = 'JOIN aset ON audit_fisik.id_aset = aset.id_aset';
+            $col_date = 'audit_fisik.tanggal_audit';
             break;
         case 'nilai_aset':
             $table = 'aset';
             $where[] = "harga > 0";
+            $col_date = 'tanggal_masuk';
             break;
         case 'kalibrasi':
             $table = 'perawatan';
+            $col_date = 'tanggal';
             break;
         case 'pelacakan_lokasi':
-            $table = 'aset';
+            // PENTING: Menggunakan tabel riwayat_lokasi sesuai dengan file laporan_pelacakan.php
+            $table = 'riwayat_lokasi';
+            $join = 'JOIN aset ON riwayat_lokasi.id_aset = aset.id_aset';
+            $col_date = 'riwayat_lokasi.tanggal_pindah';
             break;
         default:
             return 0;
     }
 
+    // Filter berdasarkan tahun jika dipilih
     if (!empty($tahun)) {
-        // Cek nama kolom tanggal di tabel secara dinamis
-        $col_date = 'tanggal'; // default
-        if ($table == 'aset') $col_date = 'tanggal_masuk';
-        elseif ($table == 'audit_fisik') $col_date = 'tanggal_audit';
-
-        // Pengecekan aman, jika kolom tanggal beda nama, cari yg ada unsur 'tanggal'
-        $check_col = @mysqli_query($koneksi, "SHOW COLUMNS FROM $table LIKE '$col_date'");
-        if (mysqli_num_rows($check_col) == 0) {
-            $res_cols = @mysqli_query($koneksi, "SHOW COLUMNS FROM $table LIKE '%tanggal%'");
-            if ($row_col = mysqli_fetch_assoc($res_cols)) {
-                $col_date = $row_col['Field'];
-            }
-        }
-
         $where[] = "YEAR($col_date) = '$tahun'";
     }
 
     $whereClause = count($where) > 0 ? "WHERE " . implode(" AND ", $where) : "";
-    $sql = "SELECT COUNT(*) as total FROM $table $whereClause";
+
+    // Gabungkan query dengan JOIN jika ada
+    $sql = "SELECT COUNT(*) as total FROM $table $join $whereClause";
 
     $res = @mysqli_query($koneksi, $sql);
 
-    // Jika query gagal (misal karena tabel tidak ada kolom tahun), hitung total tanpa filter tahun
+    // Fallback jika terjadi error (misal nama kolom tanggal berbeda untuk kerusakan/perawatan)
     if (!$res) {
         $where_no_year = array_filter($where, function ($w) {
             return strpos($w, 'YEAR(') === false;
         });
         $whereClause2 = count($where_no_year) > 0 ? "WHERE " . implode(" AND ", $where_no_year) : "";
-        $res = @mysqli_query($koneksi, "SELECT COUNT(*) as total FROM $table $whereClause2");
+        $sql2 = "SELECT COUNT(*) as total FROM $table $join $whereClause2";
+        $res = @mysqli_query($koneksi, $sql2);
     }
 
     $data = $res ? mysqli_fetch_assoc($res) : ['total' => 0];
@@ -141,15 +149,13 @@ function getReportLink($jenis)
 
         case 'Laporan Rekapitulasi Nilai Aset':
             return 'laporan_nilai.php';
-
             // LINK BARU
         case 'Laporan Kalibrasi':
-            return 'laporan_perawatan.php';
+            return 'laporan_kalibrasi.php';
 
             // LINK BARU
         case 'Laporan Pelacakan Lokasi Aset':
-            return 'laporan_aset.php';
-
+            return 'laporan_pelacakan.php';
         default:
             return '#';
     }

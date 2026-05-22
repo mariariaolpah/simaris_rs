@@ -65,8 +65,9 @@ if (count($subHeader) > 0) {
 }
 $pdf->Ln(4);
 
-$w = [10, 40, 25, 25, 35, 22, 25, 95];
-$header = ['No', 'Nama Aset', 'Kategori', 'Lokasi', 'Auditor', 'Tgl Audit', 'Kondisi', 'Keterangan Tambahan'];
+// Kolom "Bukti Fisik" ditambahkan. Total Array Widths harus 277mm untuk kertas landscape.
+$w = [10, 38, 22, 25, 25, 20, 20, 25, 92];
+$header = ['No', 'Nama Aset', 'Kategori', 'Lokasi', 'Auditor', 'Tgl Audit', 'Kondisi', 'Bukti Fisik', 'Keterangan Tambahan'];
 
 function cetakHeaderAudit($pdf, $w, $header)
 {
@@ -95,8 +96,9 @@ if ($res && mysqli_num_rows($res) > 0) {
         $kondisi    = $r['kondisi_fisik'] ?? '-';
         $keterangan = $r['keterangan'] ?? '-';
 
+        // Hitung Tinggi Baris (Penyediaan ruang untuk gambar jika ada)
         $maxLine = max(
-            1,
+            3, // Pastikan tinggi baris cukup lebar untuk image (15mm)
             ceil(strlen($nama_aset) / 22),
             ceil(strlen($keterangan) / 60)
         );
@@ -137,8 +139,24 @@ if ($res && mysqli_num_rows($res) > 0) {
         $pdf->SetXY($x + $w[0] + $w[1] + $w[2] + $w[3] + $w[4] + $w[5], $y + 2);
         $pdf->Cell($w[6], 5, $kondisi, 0, 0, 'C');
 
-        $pdf->SetXY($x + $w[0] + $w[1] + $w[2] + $w[3] + $w[4] + $w[5] + $w[6] + 1, $y + 2);
-        $pdf->MultiCell($w[7] - 2, 5, $keterangan, 0, 'L');
+        // Render Gambar ke dalam sel Bukti Fisik
+        $imgPath = __DIR__ . '/../assets/img/' . ($r['gambar_rusak'] ?? '');
+        $imgColStart = $x + $w[0] + $w[1] + $w[2] + $w[3] + $w[4] + $w[5] + $w[6];
+
+        if (!empty($r['gambar_rusak']) && file_exists($imgPath)) {
+            // Posisi tengah untuk render gambar
+            $imgWidth = 18;
+            $imgHeight = 14;
+            $imgX = $imgColStart + (($w[7] - $imgWidth) / 2);
+            $imgY = $y + (($tinggi - $imgHeight) / 2);
+            $pdf->Image($imgPath, $imgX, $imgY, $imgWidth, $imgHeight);
+        } else {
+            $pdf->SetXY($imgColStart, $y + 2);
+            $pdf->Cell($w[7], $tinggi - 4, '-', 0, 0, 'C');
+        }
+
+        $pdf->SetXY($x + $w[0] + $w[1] + $w[2] + $w[3] + $w[4] + $w[5] + $w[6] + $w[7] + 1, $y + 2);
+        $pdf->MultiCell($w[8] - 2, 5, $keterangan, 0, 'L');
 
         $pdf->SetY($y + $tinggi);
     }
