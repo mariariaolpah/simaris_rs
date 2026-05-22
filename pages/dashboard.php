@@ -131,7 +131,10 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
     <title>Dashboard | SIMARIS RS Bhayangkara</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
     <style>
         body {
             font-family: 'Poppins', sans-serif;
@@ -400,7 +403,10 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
                 </div>
 
                 <script>
-                    // Grafik Kondisi Aset (Lama)
+                    // Daftarkan Plugin Datalabels
+                    Chart.register(ChartDataLabels);
+
+                    // Grafik Kondisi Aset
                     const ctx = document.getElementById('asetChart').getContext('2d');
                     new Chart(ctx, {
                         type: 'pie',
@@ -415,6 +421,27 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
                         },
                         options: {
                             plugins: {
+                                datalabels: {
+                                    color: '#fff',
+                                    font: {
+                                        weight: 'bold',
+                                        size: 13
+                                    },
+                                    textAlign: 'center',
+                                    formatter: (value, ctx) => {
+                                        let sum = 0;
+                                        let dataArr = ctx.chart.data.datasets[0].data;
+                                        dataArr.map(data => {
+                                            sum += Number(data);
+                                        });
+                                        if (value > 0 && sum > 0) {
+                                            let percentage = (value * 100 / sum).toFixed(1) + "%";
+                                            // Menampilkan format: Angka dan persentase di baris bawahnya
+                                            return [value, "(" + percentage + ")"];
+                                        }
+                                        return null;
+                                    }
+                                },
                                 legend: {
                                     position: 'bottom'
                                 }
@@ -422,7 +449,7 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
                         }
                     });
 
-                    // Grafik Kategori Aset (Baru)
+                    // Grafik Kategori Aset
                     const ctxKat = document.getElementById('kategoriChart').getContext('2d');
                     new Chart(ctxKat, {
                         type: 'doughnut',
@@ -437,6 +464,27 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
                         },
                         options: {
                             plugins: {
+                                datalabels: {
+                                    color: '#fff',
+                                    font: {
+                                        weight: 'bold',
+                                        size: 13
+                                    },
+                                    textAlign: 'center',
+                                    formatter: (value, ctx) => {
+                                        let sum = 0;
+                                        let dataArr = ctx.chart.data.datasets[0].data;
+                                        dataArr.map(data => {
+                                            sum += Number(data);
+                                        });
+                                        if (value > 0 && sum > 0) {
+                                            let percentage = (value * 100 / sum).toFixed(1) + "%";
+                                            // Menampilkan format: Angka dan persentase di baris bawahnya
+                                            return [value, "(" + percentage + ")"];
+                                        }
+                                        return null;
+                                    }
+                                },
                                 legend: {
                                     position: 'bottom'
                                 }
@@ -448,6 +496,7 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
             </div>
         </div>
     </div>
+
     <audio id="notifSound" src="../assets/notification.mp3" preload="auto"></audio>
 
     <script>
@@ -486,7 +535,6 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
                 }, 500);
             }
         });
-    </script>
     </script>
 </body>
 

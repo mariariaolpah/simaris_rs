@@ -33,6 +33,7 @@ $offset = ($page - 1) * $limit;
 // Menangkap Tab Aktif (Default: medis)
 $kategori_filter = isset($_GET['kategori']) ? $_GET['kategori'] : 'medis';
 $search = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : "";
+$tahun_filter = isset($_GET['tahun']) ? mysqli_real_escape_string($koneksi, $_GET['tahun']) : "";
 
 $whereConditions = [];
 
@@ -48,10 +49,20 @@ if ($kategori_filter == 'medis') {
     $whereConditions[] = "kategori_aset = 'Non-Medis'";
 }
 
+// Filter berdasarkan Tahun
+if ($tahun_filter != '') {
+    $whereConditions[] = "YEAR(tanggal_masuk) = '$tahun_filter'";
+}
+
 $whereClause = "";
 if (count($whereConditions) > 0) {
     $whereClause = "WHERE " . implode(" AND ", $whereConditions);
 }
+
+// Helper URL parameter agar pagination dan tab tidak reset saat difilter
+$url_params = "";
+if ($search != '') $url_params .= '&search=' . urlencode($search);
+if ($tahun_filter != '') $url_params .= '&tahun=' . urlencode($tahun_filter);
 
 // Ambil data dengan limit, offset, dan filter
 $query = mysqli_query($koneksi, "SELECT * FROM aset $whereClause ORDER BY id_aset ASC LIMIT $limit OFFSET $offset");
@@ -257,6 +268,16 @@ while ($row = mysqli_fetch_assoc($query)) {
                         <div class="d-flex gap-2">
                             <form method="GET" class="d-flex gap-1 align-items-center">
                                 <input type="hidden" name="kategori" value="<?= htmlspecialchars($kategori_filter) ?>">
+                                <select name="tahun" class="form-select form-select-sm bg-light text-dark border-0" style="border-radius: 6px; cursor: pointer; min-width: 120px;">
+                                    <option value="">Semua Tahun</option>
+                                    <?php
+                                    $tahun_sekarang = date('Y');
+                                    for ($i = $tahun_sekarang; $i >= 2020; $i--) {
+                                        $selected = ($tahun_filter == $i) ? 'selected' : '';
+                                        echo "<option value='$i' $selected>$i</option>";
+                                    }
+                                    ?>
+                                </select>
                                 <input type="text" name="search" class="form-control form-control-sm bg-light text-dark border-0"
                                     placeholder="Cari aset..." style="border-radius: 6px; padding: 6px 12px;"
                                     value="<?= htmlspecialchars($search) ?>">
@@ -267,7 +288,7 @@ while ($row = mysqli_fetch_assoc($query)) {
                             <a href="aset_tambah.php" class="btn btn-light btn-sm" style="border-radius: 6px;">
                                 <i class="bi bi-plus-lg"></i> Tambah
                             </a>
-                            <a href="aset_cetak.php?kategori=<?= $kategori_filter ?><?= $search ? '&search=' . urlencode($search) : '' ?>"
+                            <a href="aset_cetak.php?kategori=<?= $kategori_filter ?><?= $url_params ?>"
                                 target="_blank" class="btn btn-light btn-sm" style="border-radius: 6px;">
                                 <i class="bi bi-file-earmark-pdf"></i> Cetak PDF
                             </a>
@@ -277,20 +298,20 @@ while ($row = mysqli_fetch_assoc($query)) {
                     <ul class="nav nav-tabs">
                         <li class="nav-item">
                             <a class="nav-link <?= ($kategori_filter == 'medis') ? 'active-medis' : '' ?>"
-                                href="?kategori=medis<?= $search ? '&search=' . urlencode($search) : '' ?>">
-                                🏥 Aset Medis (Alkes)
+                                href="?kategori=medis<?= $url_params ?>">
+                                ⚕️ Aset Medis (Alkes)
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link <?= ($kategori_filter == 'non-medis') ? 'active-nonmedis' : '' ?>"
-                                href="?kategori=non-medis<?= $search ? '&search=' . urlencode($search) : '' ?>">
-                                🪑 Aset Non-Medis
+                                href="?kategori=non-medis<?= $url_params ?>">
+                                🖥️ Aset Non-Medis
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link <?= ($kategori_filter == 'semua') ? 'active-semua' : '' ?>"
-                                href="?kategori=semua<?= $search ? '&search=' . urlencode($search) : '' ?>">
-                                📋 Semua Aset
+                                href="?kategori=semua<?= $url_params ?>">
+                                📦 Semua Aset
                             </a>
                         </li>
                     </ul>
@@ -396,7 +417,7 @@ while ($row = mysqli_fetch_assoc($query)) {
                                 <ul class="pagination pagination-sm mb-0">
                                     <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
                                         <a class="page-link" style="border-radius: 6px 0 0 6px;"
-                                            href="?page=<?= $page - 1 ?>&kategori=<?= $kategori_filter ?><?= $search ? '&search=' . urlencode($search) : '' ?>">
+                                            href="?page=<?= $page - 1 ?>&kategori=<?= $kategori_filter ?><?= $url_params ?>">
                                             Prev
                                         </a>
                                     </li>
@@ -405,7 +426,7 @@ while ($row = mysqli_fetch_assoc($query)) {
                                     </li>
                                     <li class="page-item <?= ($page >= $total_page) ? 'disabled' : '' ?>">
                                         <a class="page-link" style="border-radius: 0 6px 6px 0;"
-                                            href="?page=<?= $page + 1 ?>&kategori=<?= $kategori_filter ?><?= $search ? '&search=' . urlencode($search) : '' ?>">
+                                            href="?page=<?= $page + 1 ?>&kategori=<?= $kategori_filter ?><?= $url_params ?>">
                                             Next
                                         </a>
                                     </li>

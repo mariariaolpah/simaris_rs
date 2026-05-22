@@ -8,18 +8,16 @@ if (!isset($_SESSION['id_pengguna'])) {
 include(__DIR__ . '/../config/koneksi.php');
 
 $id = intval($_GET['id']);
-// Ambil data audit yang lama
 $data = mysqli_query($koneksi, "SELECT * FROM audit_fisik WHERE id_audit = $id");
 $row = mysqli_fetch_assoc($data);
 
-// Ambil daftar aset untuk pilihan dropdown
 $aset_query = mysqli_query($koneksi, "SELECT * FROM aset ORDER BY nama_aset ASC");
 
-// Penanganan nilai lama agar aman dari perbedaan nama kolom database
 $tgl_value = isset($row['tanggal_audit']) ? $row['tanggal_audit'] : (isset($row['tanggal']) ? $row['tanggal'] : '');
 $kondisi_value = isset($row['kondisi_fisik']) ? $row['kondisi_fisik'] : (isset($row['kondisi']) ? $row['kondisi'] : 'Baik');
 $auditor_value = isset($row['auditor']) ? $row['auditor'] : '';
 $keterangan_value = isset($row['keterangan']) ? $row['keterangan'] : '';
+$gambar_lama = isset($row['gambar_rusak']) ? $row['gambar_rusak'] : '';
 
 if (isset($_POST['update'])) {
     $id_aset = $_POST['id_aset'];
@@ -28,31 +26,50 @@ if (isset($_POST['update'])) {
     $tgl = $_POST['tanggal_audit'];
     $kondisi = $_POST['kondisi_fisik'];
 
-    // OPSI 1: Update menggunakan nama kolom standar skripsi
+    // LOGIKA UPLOAD GAMBAR EDIT - TANPA BIKIN FOLDER
+    $nama_gambar_baru = $gambar_lama;
+    if (isset($_FILES['gambar_kerusakan']) && $_FILES['gambar_kerusakan']['error'] == 0) {
+        $file_name = time() . '_' . $_FILES['gambar_kerusakan']['name'];
+        $tmp_name = $_FILES['gambar_kerusakan']['tmp_name'];
+
+        $folder = __DIR__ . '/../assets/img/';
+
+        // Hapus file lama jika ada
+        if (!empty($gambar_lama) && file_exists($folder . $gambar_lama)) {
+            unlink($folder . $gambar_lama);
+        }
+
+        move_uploaded_file($tmp_name, $folder . $file_name);
+        $nama_gambar_baru = $file_name;
+    }
+
+    // OPSI 1
     $update1 = "UPDATE audit_fisik SET 
                 id_aset='$id_aset', 
                 tanggal_audit='$tgl', 
                 auditor='$auditor',
                 kondisi_fisik='$kondisi', 
-                keterangan='$ket' 
+                keterangan='$ket',
+                gambar_rusak='$nama_gambar_baru'
                 WHERE id_audit=$id";
 
     if (@mysqli_query($koneksi, $update1)) {
         echo "<script>alert('Data audit fisik berhasil diperbarui!'); window.location='audit_fisik.php';</script>";
     } else {
-        // OPSI 2: Fallback jika nama kolom database berbeda
+        // OPSI 2
         $update2 = "UPDATE audit_fisik SET 
                     id_aset='$id_aset', 
                     tanggal='$tgl', 
                     auditor='$auditor',
                     kondisi='$kondisi', 
-                    keterangan='$ket' 
+                    keterangan='$ket',
+                    gambar_rusak='$nama_gambar_baru'
                     WHERE id_audit=$id";
 
         if (mysqli_query($koneksi, $update2)) {
             echo "<script>alert('Data audit fisik berhasil diperbarui!'); window.location='audit_fisik.php';</script>";
         } else {
-            echo "<script>alert('Gagal memperbarui data! Periksa kembali kesesuaian nama kolom tabel audit_fisik Anda.');</script>";
+            echo "<script>alert('Gagal memperbarui data! Periksa database.');</script>";
         }
     }
 }
@@ -145,6 +162,15 @@ if (isset($_POST['update'])) {
             border-radius: 6px;
             margin-bottom: 20px;
         }
+
+        .img-preview {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 
@@ -168,12 +194,11 @@ if (isset($_POST['update'])) {
                     </div>
 
                     <div class="card-body p-4">
-                        <form method="POST">
-
+                        <form method="POST" enctype="multipart/form-data">
                             <div class="mb-4">
                                 <label class="form-label">Pilih Aset / Alat yang Diperiksa</label>
                                 <select name="id_aset" class="form-select" required>
-                                    <option value="">-- Pilih Alat Kesehatan / Infrastruktur RS --</option>
+                                    <option value="">-- Pilih Alat Kesehatan --</option>
                                     <?php while ($a = mysqli_fetch_assoc($aset_query)) : ?>
                                         <option value="<?= $a['id_aset'] ?>" <?= $a['id_aset'] == $row['id_aset'] ? 'selected' : '' ?>>
                                             <?= htmlspecialchars($a['nama_aset']) ?> — (📍 Ruangan: <?= htmlspecialchars($a['lokasi']) ?>)
@@ -207,8 +232,19 @@ if (isset($_POST['update'])) {
                                 <textarea name="keterangan" class="form-control" rows="4" required><?= htmlspecialchars($keterangan_value) ?></textarea>
                             </div>
 
-                            <hr>
+                            <div class="mb-4 p-3 bg-light rounded border">
+                                <label class="form-label">Ganti Bukti Gambar Fisik (Opsional)</label><br>
+                                <?php if (!empty($gambar_lama)): ?>
+                                    <img src="../assets/img/<?= htmlspecialchars($gambar_lama) ?>" alt="Bukti Lama" class="img-preview d-block">
+                                    <small class="text-secondary d-block mb-2">Gambar saat ini. Biarkan kosong jika tidak diganti.</small>
+                                <?php else: ?>
+                                    <small class="text-secondary d-block mb-2">Belum ada gambar sebelumnya.</small>
+                                <?php endif; ?>
 
+                                <input type="file" name="gambar_kerusakan" class="form-control" accept=".png, .jpg, .jpeg">
+                            </div>
+
+                            <hr>
                             <div class="row g-2 mt-2">
                                 <div class="col-sm-8">
                                     <button type="submit" name="update" class="btn btn-success w-100 py-2 fw-bold" style="border-radius: 8px;">
@@ -221,7 +257,6 @@ if (isset($_POST['update'])) {
                                     </a>
                                 </div>
                             </div>
-
                         </form>
                     </div>
                 </div>

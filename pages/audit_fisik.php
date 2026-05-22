@@ -15,6 +15,7 @@ $offset = ($page - 1) * $batas;
 
 $search = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : "";
 $kategori_filter = isset($_GET['kategori']) ? $_GET['kategori'] : 'medis';
+$tahun_filter = isset($_GET['tahun']) ? (int)$_GET['tahun'] : "";
 
 $whereConditions = [];
 
@@ -30,10 +31,20 @@ if ($kategori_filter == 'medis') {
     $whereConditions[] = "aset.kategori_aset = 'Non-Medis'";
 }
 
+if (!empty($tahun_filter)) {
+    $whereConditions[] = "YEAR(audit_fisik.tanggal_audit) = $tahun_filter";
+}
+
 $whereClause = "";
 if (count($whereConditions) > 0) {
     $whereClause = "WHERE " . implode(" AND ", $whereConditions);
 }
+
+// Helper URL parameter agar pagination dan tab tidak reset saat difilter
+$url_params = "";
+if ($search != '') $url_params .= '&search=' . urlencode($search);
+if ($tahun_filter != '') $url_params .= '&tahun=' . urlencode($tahun_filter);
+
 
 /* ================= TOTAL DATA ================= */
 $totalData = mysqli_fetch_assoc(mysqli_query(
@@ -212,6 +223,29 @@ $query = mysqli_query($koneksi, "
             border-radius: 6px;
             font-weight: 500;
         }
+
+        .btn-action-group {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+        }
+
+        .btn-sm-custom {
+            padding: 5px 10px;
+            font-size: 0.85rem;
+            border-radius: 6px;
+        }
+
+        /* Tampilan Gambar di Tabel */
+        .img-kerusakan {
+            width: 55px;
+            height: 55px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            padding: 2px;
+            background-color: #fff;
+        }
     </style>
 </head>
 
@@ -255,6 +289,17 @@ $query = mysqli_query($koneksi, "
 
                                 <input type="hidden" name="kategori" value="<?= htmlspecialchars($kategori_filter) ?>">
 
+                                <select name="tahun" class="form-select form-select-sm bg-light text-dark border-0" style="border-radius: 6px; min-width: 160px; cursor:pointer;">
+                                    <option value="">Semua Tahun</option>
+                                    <?php
+                                    $thn_skrg = date('Y');
+                                    for ($thn = $thn_skrg; $thn >= ($thn_skrg - 10); $thn--) {
+                                        $selected = ($tahun_filter == $thn) ? 'selected' : '';
+                                        echo "<option value='$thn' $selected>$thn</option>";
+                                    }
+                                    ?>
+                                </select>
+
                                 <input type="text"
                                     name="search"
                                     class="form-control form-control-sm bg-light text-dark border-0"
@@ -274,9 +319,9 @@ $query = mysqli_query($koneksi, "
                                 <i class="bi bi-plus-lg"></i> Tambah
                             </a>
 
-                            <a href="audit_cetak.php?kategori=<?= $kategori_filter ?>&search=<?= urlencode($search) ?>"
+                            <a href="audit_cetak.php?kategori=<?= $kategori_filter ?><?= $url_params ?>"
                                 class="btn btn-light btn-sm"
-                                style="border-radius: 6px;">
+                                style="border-radius: 6px;" target="_blank">
                                 <i class="bi bi-file-earmark-pdf"></i> Cetak PDF
                             </a>
 
@@ -284,27 +329,26 @@ $query = mysqli_query($koneksi, "
 
                     </div>
 
-                    <!-- TAB -->
                     <ul class="nav nav-tabs">
 
                         <li class="nav-item">
                             <a class="nav-link <?= ($kategori_filter == 'medis') ? 'active-medis' : '' ?>"
-                                href="?kategori=medis<?= $search ? '&search=' . urlencode($search) : '' ?>">
-                                🏥 Aset Medis
+                                href="?kategori=medis<?= $url_params ?>">
+                                唱 Aset Medis
                             </a>
                         </li>
 
                         <li class="nav-item">
                             <a class="nav-link <?= ($kategori_filter == 'non-medis') ? 'active-nonmedis' : '' ?>"
-                                href="?kategori=non-medis<?= $search ? '&search=' . urlencode($search) : '' ?>">
-                                🪑 Aset Non-Medis
+                                href="?kategori=non-medis<?= $url_params ?>">
+                                ｪAset Non-Medis
                             </a>
                         </li>
 
                         <li class="nav-item">
                             <a class="nav-link <?= ($kategori_filter == 'semua') ? 'active-semua' : '' ?>"
-                                href="?kategori=semua<?= $search ? '&search=' . urlencode($search) : '' ?>">
-                                📋 Semua Aset
+                                href="?kategori=semua<?= $url_params ?>">
+                                搭 Semua Aset
                             </a>
                         </li>
 
@@ -318,15 +362,16 @@ $query = mysqli_query($koneksi, "
 
                                 <thead>
                                     <tr>
-                                        <th>No</th>
+                                        <th style="width: 50px;">No</th>
                                         <th>Nama Aset</th>
                                         <th>Lokasi</th>
                                         <th>Kategori</th>
                                         <th>Tanggal</th>
                                         <th>Auditor</th>
                                         <th>Kondisi</th>
+                                        <th>Bukti Fisik</th>
                                         <th>Keterangan</th>
-                                        <th>Aksi</th>
+                                        <th style="width: 100px;">Aksi</th>
                                     </tr>
                                 </thead>
 
@@ -335,7 +380,7 @@ $query = mysqli_query($koneksi, "
                                     <?php if (mysqli_num_rows($query) == 0): ?>
 
                                         <tr>
-                                            <td colspan="9" class="text-muted py-5 text-center">
+                                            <td colspan="10" class="text-muted py-5 text-center">
                                                 <i class="bi bi-inboxes text-secondary d-block mb-2" style="font-size: 2rem;"></i>
                                                 Data audit fisik belum tersedia.
                                             </td>
@@ -349,9 +394,9 @@ $query = mysqli_query($koneksi, "
 
                                             <tr>
 
-                                                <td><?= $no++ ?></td>
+                                                <td class="text-secondary"><?= $no++ ?></td>
 
-                                                <td class="text-start fw-bold">
+                                                <td class="text-start fw-bold text-dark">
                                                     <?= htmlspecialchars($row['nama_aset']) ?>
                                                 </td>
 
@@ -369,7 +414,7 @@ $query = mysqli_query($koneksi, "
                                                 </td>
 
                                                 <td>
-                                                    <?= date('d-m-Y', strtotime($row['tanggal_audit'])) ?>
+                                                    <?= isset($row['tanggal_audit']) ? date('d-m-Y', strtotime($row['tanggal_audit'])) : date('d-m-Y', strtotime($row['tanggal'])) ?>
                                                 </td>
 
                                                 <td>
@@ -377,7 +422,24 @@ $query = mysqli_query($koneksi, "
                                                 </td>
 
                                                 <td>
-                                                    <?= htmlspecialchars($row['kondisi_fisik']) ?>
+                                                    <?php
+                                                    $kondisi = isset($row['kondisi_fisik']) ? $row['kondisi_fisik'] : (isset($row['kondisi']) ? $row['kondisi'] : '');
+                                                    ?>
+                                                    <?php if (strtolower($kondisi) == 'baik'): ?>
+                                                        <span class="text-success fw-bold"><i class="bi bi-check-circle-fill me-1"></i>Baik</span>
+                                                    <?php elseif (strtolower($kondisi) == 'rusak'): ?>
+                                                        <span class="text-danger fw-bold"><i class="bi bi-x-circle-fill me-1"></i>Rusak</span>
+                                                    <?php else: ?>
+                                                        <span class="text-warning fw-bold"><i class="bi bi-exclamation-circle-fill me-1"></i><?= htmlspecialchars($kondisi) ?></span>
+                                                    <?php endif; ?>
+                                                </td>
+
+                                                <td>
+                                                    <?php if (!empty($row['gambar_rusak'])): ?>
+                                                        <img src="../assets/img/<?= htmlspecialchars($row['gambar_rusak']) ?>" alt="Bukti" class="img-kerusakan">
+                                                    <?php else: ?>
+                                                        <span class="text-muted">-</span>
+                                                    <?php endif; ?>
                                                 </td>
 
                                                 <td class="text-start">
@@ -385,21 +447,17 @@ $query = mysqli_query($koneksi, "
                                                 </td>
 
                                                 <td>
-                                                    <div class="d-flex gap-1 justify-content-center">
-
+                                                    <div class="btn-action-group">
                                                         <a href="audit_edit.php?id=<?= $row['id_audit'] ?>"
-                                                            class="btn btn-warning btn-sm text-white"
-                                                            style="border-radius:6px;">
+                                                            class="btn btn-warning text-white btn-sm-custom" title="Edit Data">
                                                             <i class="bi bi-pencil-square"></i>
                                                         </a>
 
                                                         <a href="audit_hapus.php?id=<?= $row['id_audit'] ?>"
-                                                            class="btn btn-danger btn-sm"
-                                                            style="border-radius:6px;"
-                                                            onclick="return confirm('Hapus data audit ini?')">
-                                                            <i class="bi bi-trash"></i>
+                                                            class="btn btn-danger btn-sm-custom" title="Hapus Data"
+                                                            onclick="return confirm('Apakah Anda yakin ingin menghapus data audit ini?')">
+                                                            <i class="bi bi-trash-fill"></i>
                                                         </a>
-
                                                     </div>
                                                 </td>
 
@@ -415,7 +473,6 @@ $query = mysqli_query($koneksi, "
 
                         </div>
 
-                        <!-- PAGINATION -->
                         <div class="card-footer bg-white d-flex justify-content-end py-3 border-top-0">
 
                             <nav>
@@ -425,7 +482,7 @@ $query = mysqli_query($koneksi, "
                                     <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
                                         <a class="page-link"
                                             style="border-radius: 6px 0 0 6px;"
-                                            href="?page=<?= $page - 1 ?>&kategori=<?= $kategori_filter ?>&search=<?= urlencode($search) ?>">
+                                            href="?page=<?= $page - 1 ?>&kategori=<?= $kategori_filter ?><?= $url_params ?>">
                                             Prev
                                         </a>
                                     </li>
@@ -439,7 +496,7 @@ $query = mysqli_query($koneksi, "
                                     <li class="page-item <?= ($page >= $totalPage) ? 'disabled' : '' ?>">
                                         <a class="page-link"
                                             style="border-radius: 0 6px 6px 0;"
-                                            href="?page=<?= $page + 1 ?>&kategori=<?= $kategori_filter ?>&search=<?= urlencode($search) ?>">
+                                            href="?page=<?= $page + 1 ?>&kategori=<?= $kategori_filter ?><?= $url_params ?>">
                                             Next
                                         </a>
                                     </li>

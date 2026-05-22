@@ -7,7 +7,6 @@ if (!isset($_SESSION['id_pengguna'])) {
 
 include(__DIR__ . '/../config/koneksi.php');
 
-// Ambil semua aset untuk keperluan pemeriksaan audit (semua kondisi boleh diaudit)
 $aset_query = mysqli_query($koneksi, "SELECT * FROM aset ORDER BY nama_aset ASC");
 
 if (isset($_POST['simpan'])) {
@@ -17,21 +16,36 @@ if (isset($_POST['simpan'])) {
     $tanggal_input = $_POST['tanggal_audit'];
     $kondisi_input = $_POST['kondisi_fisik'];
 
-    // OPSI 1: Mencoba insert dengan nama kolom standar skripsi
-    $query1 = "INSERT INTO audit_fisik (id_aset, tanggal_audit, auditor, kondisi_fisik, keterangan) 
-               VALUES ('$id_aset', '$tanggal_input', '$auditor', '$kondisi_input', '$keterangan')";
+    // LOGIKA UPLOAD GAMBAR - LANGSUNG TANPA BIKIN FOLDER
+    $nama_gambar = "";
+    if (isset($_FILES['gambar_kerusakan']) && $_FILES['gambar_kerusakan']['error'] == 0) {
+        // Ganti nama file biar tidak bentrok
+        $file_name = time() . '_' . $_FILES['gambar_kerusakan']['name'];
+        $tmp_name = $_FILES['gambar_kerusakan']['tmp_name'];
+
+        // Arahkan langsung ke folder img yang sudah ada
+        $folder = __DIR__ . '/../assets/img/';
+
+        // Pindahkan file
+        move_uploaded_file($tmp_name, $folder . $file_name);
+        $nama_gambar = $file_name;
+    }
+
+    // OPSI 1: Insert dengan nama kolom gambar_rusak
+    $query1 = "INSERT INTO audit_fisik (id_aset, tanggal_audit, auditor, kondisi_fisik, keterangan, gambar_rusak) 
+               VALUES ('$id_aset', '$tanggal_input', '$auditor', '$kondisi_input', '$keterangan', '$nama_gambar')";
 
     if (@mysqli_query($koneksi, $query1)) {
         echo "<script>alert('Data audit fisik berhasil ditambahkan!'); window.location='audit_fisik.php';</script>";
     } else {
-        // OPSI 2: Jika Opsi 1 gagal karena nama kolom berbeda, coba gunakan nama kolom alternatif ini
-        $query2 = "INSERT INTO audit_fisik (id_aset, tanggal, auditor, kondisi, keterangan) 
-                   VALUES ('$id_aset', '$tanggal_input', '$auditor', '$kondisi_input', '$keterangan')";
+        // OPSI 2: Fallback jika nama kolom berbeda
+        $query2 = "INSERT INTO audit_fisik (id_aset, tanggal, auditor, kondisi, keterangan, gambar_rusak) 
+                   VALUES ('$id_aset', '$tanggal_input', '$auditor', '$kondisi_input', '$keterangan', '$nama_gambar')";
 
         if (mysqli_query($koneksi, $query2)) {
             echo "<script>alert('Data audit fisik berhasil ditambahkan!'); window.location='audit_fisik.php';</script>";
         } else {
-            echo "<script>alert('Gagal menyimpan data! Periksa kembali kesesuaian nama kolom tabel audit_fisik Anda.');</script>";
+            echo "<script>alert('Gagal menyimpan data! Periksa kolom database.');</script>";
         }
     }
 }
@@ -147,26 +161,17 @@ if (isset($_POST['simpan'])) {
                     </div>
 
                     <div class="card-body p-4">
-                        <form method="POST">
-
+                        <form method="POST" enctype="multipart/form-data">
                             <div class="mb-4">
                                 <label class="form-label">Pilih Aset / Alat yang Diperiksa</label>
-
                                 <select name="id_aset" class="form-select" required>
                                     <option value="">-- Pilih Aset & Ruangan --</option>
-
                                     <?php while ($a = mysqli_fetch_assoc($aset_query)) : ?>
                                         <option value="<?= $a['id_aset'] ?>">
-                                            <?= htmlspecialchars($a['nama_aset']) ?>
-                                            | Ruangan: <?= htmlspecialchars($a['lokasi']) ?>
+                                            <?= htmlspecialchars($a['nama_aset']) ?> | Ruangan: <?= htmlspecialchars($a['lokasi']) ?>
                                         </option>
                                     <?php endwhile; ?>
-
                                 </select>
-
-                                <div class="form-text text-muted">
-                                    Data ruangan otomatis diambil dari master data aset.
-                                </div>
                             </div>
 
                             <div class="row">
@@ -176,7 +181,7 @@ if (isset($_POST['simpan'])) {
                                 </div>
                                 <div class="col-md-6 mb-4">
                                     <label class="form-label">Nama Auditor / Pemeriksa</label>
-                                    <input type="text" name="auditor" class="form-control" placeholder="Contoh: Tim Mutu RS / Nama Petugas" required>
+                                    <input type="text" name="auditor" class="form-control" placeholder="Contoh: Tim Mutu RS" required>
                                 </div>
                             </div>
 
@@ -187,16 +192,20 @@ if (isset($_POST['simpan'])) {
                                     <option value="Perlu Perawatan">Perlu Perawatan / Kalibrasi</option>
                                     <option value="Rusak">Rusak (Tidak Operasional)</option>
                                 </select>
-                                <small class="text-secondary">Pencatatan ini digunakan untuk membandingkan kecocokan status sistem dengan kondisi asli di lapangan.</small>
                             </div>
 
                             <div class="mb-4">
                                 <label class="form-label">Keterangan / Temuan Detail Lapangan</label>
-                                <textarea name="text" class="form-control" rows="4" placeholder="Contoh: Alat menyala normal namun roda penyangga sebelah kanan agak longgar, perlu pengetatan sekrup." required></textarea>
+                                <textarea name="keterangan" class="form-control" rows="4" placeholder="Contoh: Alat menyala normal namun roda penyangga longgar." required></textarea>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Unggah Bukti Gambar Fisik (Opsional)</label>
+                                <input type="file" name="gambar_kerusakan" class="form-control" accept=".png, .jpg, .jpeg">
+                                <small class="text-secondary">Kosongkan jika tidak ada foto. (Batas maksimal mengikuti aturan Laragon)</small>
                             </div>
 
                             <hr>
-
                             <div class="row g-2 mt-2">
                                 <div class="col-sm-8">
                                     <button type="submit" name="simpan" class="btn btn-success w-100 py-2 fw-bold" style="border-radius: 8px;">
@@ -209,7 +218,6 @@ if (isset($_POST['simpan'])) {
                                     </a>
                                 </div>
                             </div>
-
                         </form>
                     </div>
                 </div>

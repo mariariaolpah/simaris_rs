@@ -7,65 +7,87 @@ if (!isset($_SESSION['id_pengguna'])) {
 
 include(__DIR__ . '/../config/koneksi.php');
 
+$tahun_filter = isset($_GET['tahun']) ? (int)$_GET['tahun'] : "";
+
 // =======================
 // FUNGSI HITUNG DATA
 // =======================
-function getCount($koneksi, $jenis)
+function getCount($koneksi, $jenis, $tahun)
 {
+    $table = '';
+    $where = [];
+
     switch ($jenis) {
-
         case 'aset':
-            $sql = "SELECT COUNT(*) as total FROM aset";
+            $table = 'aset';
             break;
-
         case 'kerusakan':
-            $sql = "SELECT COUNT(*) as total FROM kerusakan";
+            $table = 'kerusakan';
             break;
-
         case 'perawatan':
-            $sql = "SELECT COUNT(*) as total FROM perawatan";
+            $table = 'perawatan';
             break;
-
         case 'perbaikan':
-            $sql = "SELECT COUNT(*) as total 
-                    FROM kerusakan 
-                    WHERE status IN ('Dalam Perbaikan','Selesai Diperbaiki')";
+            $table = 'kerusakan';
+            $where[] = "status IN ('Dalam Perbaikan','Selesai Diperbaiki')";
             break;
-
         case 'perawatan_berjalan':
-            $sql = "SELECT COUNT(*) as total 
-                    FROM perawatan 
-                    WHERE status IN ('Belum Dimulai','Sedang Proses')";
+            $table = 'perawatan';
+            $where[] = "status IN ('Belum Dimulai','Sedang Proses')";
             break;
-
         case 'peminjaman':
-            $sql = "SELECT COUNT(*) as total FROM peminjaman";
+            $table = 'peminjaman';
             break;
-
         case 'audit_fisik':
-            $sql = "SELECT COUNT(*) as total FROM audit_fisik";
+            $table = 'audit_fisik';
             break;
-
         case 'nilai_aset':
-            $sql = "SELECT COUNT(*) as total FROM aset WHERE harga > 0";
+            $table = 'aset';
+            $where[] = "harga > 0";
             break;
-
-        // FITUR BARU
         case 'kalibrasi':
-            $sql = "SELECT COUNT(*) as total FROM perawatan";
+            $table = 'perawatan';
             break;
-
-        // FITUR BARU
         case 'pelacakan_lokasi':
-            $sql = "SELECT COUNT(*) as total FROM aset";
+            $table = 'aset';
             break;
-
         default:
             return 0;
     }
 
-    $res = mysqli_query($koneksi, $sql);
-    $data = mysqli_fetch_assoc($res);
+    if (!empty($tahun)) {
+        // Cek nama kolom tanggal di tabel secara dinamis
+        $col_date = 'tanggal'; // default
+        if ($table == 'aset') $col_date = 'tanggal_masuk';
+        elseif ($table == 'audit_fisik') $col_date = 'tanggal_audit';
+
+        // Pengecekan aman, jika kolom tanggal beda nama, cari yg ada unsur 'tanggal'
+        $check_col = @mysqli_query($koneksi, "SHOW COLUMNS FROM $table LIKE '$col_date'");
+        if (mysqli_num_rows($check_col) == 0) {
+            $res_cols = @mysqli_query($koneksi, "SHOW COLUMNS FROM $table LIKE '%tanggal%'");
+            if ($row_col = mysqli_fetch_assoc($res_cols)) {
+                $col_date = $row_col['Field'];
+            }
+        }
+
+        $where[] = "YEAR($col_date) = '$tahun'";
+    }
+
+    $whereClause = count($where) > 0 ? "WHERE " . implode(" AND ", $where) : "";
+    $sql = "SELECT COUNT(*) as total FROM $table $whereClause";
+
+    $res = @mysqli_query($koneksi, $sql);
+
+    // Jika query gagal (misal karena tabel tidak ada kolom tahun), hitung total tanpa filter tahun
+    if (!$res) {
+        $where_no_year = array_filter($where, function ($w) {
+            return strpos($w, 'YEAR(') === false;
+        });
+        $whereClause2 = count($where_no_year) > 0 ? "WHERE " . implode(" AND ", $where_no_year) : "";
+        $res = @mysqli_query($koneksi, "SELECT COUNT(*) as total FROM $table $whereClause2");
+    }
+
+    $data = $res ? mysqli_fetch_assoc($res) : ['total' => 0];
 
     return (int)($data['total'] ?? 0);
 }
@@ -73,23 +95,23 @@ function getCount($koneksi, $jenis)
 // =======================
 // DATA LAPORAN
 // =======================
-$tahunSekarang = date('Y');
+$periode_text = !empty($tahun_filter) ? $tahun_filter : 'Semua Tahun';
 
 $laporan_list = [
-    ['Laporan Aset', getCount($koneksi, 'aset'), $tahunSekarang],
-    ['Laporan Kerusakan', getCount($koneksi, 'kerusakan'), $tahunSekarang],
-    ['Laporan Perawatan', getCount($koneksi, 'perawatan'), $tahunSekarang],
-    ['Laporan Perbaikan', getCount($koneksi, 'perbaikan'), $tahunSekarang],
-    ['Laporan Perawatan Berjalan', getCount($koneksi, 'perawatan_berjalan'), $tahunSekarang],
-    ['Laporan Peminjaman Aset', getCount($koneksi, 'peminjaman'), $tahunSekarang],
-    ['Laporan Hasil Audit Fisik', getCount($koneksi, 'audit_fisik'), $tahunSekarang],
-    ['Laporan Rekapitulasi Nilai Aset', getCount($koneksi, 'nilai_aset'), 'Semua'],
+    ['Laporan Aset', getCount($koneksi, 'aset', $tahun_filter), $periode_text],
+    ['Laporan Kerusakan', getCount($koneksi, 'kerusakan', $tahun_filter), $periode_text],
+    ['Laporan Perawatan', getCount($koneksi, 'perawatan', $tahun_filter), $periode_text],
+    ['Laporan Perbaikan', getCount($koneksi, 'perbaikan', $tahun_filter), $periode_text],
+    ['Laporan Perawatan Berjalan', getCount($koneksi, 'perawatan_berjalan', $tahun_filter), $periode_text],
+    ['Laporan Peminjaman Aset', getCount($koneksi, 'peminjaman', $tahun_filter), $periode_text],
+    ['Laporan Hasil Audit Fisik', getCount($koneksi, 'audit_fisik', $tahun_filter), $periode_text],
+    ['Laporan Rekapitulasi Nilai Aset', getCount($koneksi, 'nilai_aset', $tahun_filter), $periode_text],
 
     // FITUR BARU
-    ['Laporan Kalibrasi', getCount($koneksi, 'kalibrasi'), $tahunSekarang],
+    ['Laporan Kalibrasi', getCount($koneksi, 'kalibrasi', $tahun_filter), $periode_text],
 
     // FITUR BARU
-    ['Laporan Pelacakan Lokasi Aset', getCount($koneksi, 'pelacakan_lokasi'), $tahunSekarang]
+    ['Laporan Pelacakan Lokasi Aset', getCount($koneksi, 'pelacakan_lokasi', $tahun_filter), $periode_text]
 ];
 
 function getReportLink($jenis)
@@ -184,7 +206,7 @@ function getReportLink($jenis)
         }
 
         .search-box {
-            max-width: 300px;
+            max-width: 250px;
         }
 
         .table tbody tr:hover {
@@ -221,11 +243,30 @@ function getReportLink($jenis)
 
                         <span>Data Laporan</span>
 
-                        <!-- SEARCH -->
-                        <input type="text"
-                            id="searchInput"
-                            class="form-control search-box"
-                            placeholder="Cari laporan...">
+                        <div class="d-flex gap-2 align-items-center">
+                            <form method="GET" class="mb-0">
+                                <select name="tahun" class="form-select form-select-sm border-0 text-dark" style="border-radius: 6px; min-width: 130px; cursor:pointer;" onchange="this.form.submit()">
+                                    <option value="">Semua Tahun</option>
+                                    <?php
+                                    $thn_skrg = date('Y');
+                                    for ($thn = $thn_skrg; $thn >= ($thn_skrg - 10); $thn--) {
+                                        $selected = ($tahun_filter == $thn) ? 'selected' : '';
+                                        echo "<option value='$thn' $selected>$thn</option>";
+                                    }
+                                    ?>
+                                </select>
+                            </form>
+
+                            <input type="text"
+                                id="searchInput"
+                                class="form-control form-control-sm search-box border-0"
+                                placeholder="Cari laporan..."
+                                style="border-radius: 6px;">
+
+                            <a href="cetak_semua_laporan_pdf.php<?= !empty($tahun_filter) ? '?tahun=' . $tahun_filter : '' ?>" target="_blank" class="btn btn-light btn-sm text-dark" style="border-radius: 6px; font-weight: 600; white-space: nowrap;">
+                                <i class="bi bi-printer-fill text-danger"></i> Cetak Semua
+                            </a>
+                        </div>
 
                     </div>
 
@@ -238,7 +279,7 @@ function getReportLink($jenis)
                                 <tr>
                                     <th>#</th>
                                     <th>Jenis Laporan</th>
-                                    <th>Jumlah</th>
+                                    <th>Jumlah Data</th>
                                     <th>Periode</th>
                                     <th>Status</th>
                                     <th>Aksi</th>
@@ -266,11 +307,13 @@ function getReportLink($jenis)
 
                                         <td><?= $i + 1 ?></td>
 
-                                        <td class="text-start">
+                                        <td class="text-start fw-bold text-dark">
                                             <?= $l[0] ?>
                                         </td>
 
-                                        <td><?= $l[1] ?></td>
+                                        <td>
+                                            <span class="badge bg-secondary rounded-pill fs-6 px-3"><?= $l[1] ?></span>
+                                        </td>
 
                                         <td><?= $l[2] ?></td>
 
@@ -292,9 +335,9 @@ function getReportLink($jenis)
 
                                         <td>
 
-                                            <a href="<?= getReportLink($l[0]) ?>"
+                                            <a href="<?= getReportLink($l[0]) ?><?= !empty($tahun_filter) ? '?tahun=' . $tahun_filter : '' ?>"
                                                 target="_blank"
-                                                class="btn btn-sm btn-success">
+                                                class="btn btn-sm btn-success" style="border-radius: 6px;">
 
                                                 <i class="bi bi-eye"></i> Lihat
 
@@ -316,7 +359,6 @@ function getReportLink($jenis)
         </div>
     </div>
 
-    <!-- SEARCH -->
     <script>
         const searchInput = document.getElementById('searchInput');
 

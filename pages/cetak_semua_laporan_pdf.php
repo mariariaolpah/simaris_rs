@@ -3,6 +3,8 @@ ob_clean();
 require(__DIR__ . '/../config/fpdf.php');
 include(__DIR__ . '/../config/koneksi.php');
 
+$tahun_filter = isset($_GET['tahun']) ? (int)$_GET['tahun'] : '';
+
 $pdf = new FPDF('L', 'mm', 'A4');
 $pdf->SetMargins(15, 15, 15);
 $pdf->SetAutoPageBreak(true, 15);
@@ -18,196 +20,141 @@ $pdf->Ln(5);
 $pdf->Cell(0, 10, 'RUMKIT BHAYANGKARA TK.III BANJARMASIN', 0, 1, 'C');
 $pdf->SetFont('Arial', 'B', 12);
 $pdf->Ln(3);
-$pdf->Cell(0, 7, 'LAPORAN SEMUA DATA', 0, 1, 'C');
+$pdf->Cell(0, 7, 'REKAPITULASI SEMUA DATA LAPORAN ' . ($tahun_filter ? 'TAHUN ' . $tahun_filter : ''), 0, 1, 'C');
 $pdf->Ln(8);
 
-// ==== KOLOM SESUAI LAPORAN WEB ==== //
-$customOrder = [
-    "aset"       => ['nama_aset', 'jenis', 'tipe_aset', 'lokasi', 'kondisi', 'tanggal_masuk'],
-    "kerusakan"  => ['nama_aset', 'status', 'tanggal', 'keterangan'],
-    "perawatan"  => ['nama_aset', 'teknisi', 'tanggal', 'status'],
-    "perbaikan"  => ['nama_aset', 'status', 'tanggal', 'keterangan'],
-    "pengguna"   => ['nama_pengguna', 'level']
+// ==== DAFTAR TABEL & KONFIGURASI PENGAMBILAN DATA ==== //
+// Sesuaikan nama kolom ('columns') dengan yang ada di database kamu
+$laporan_data = [
+    'Laporan Aset' => [
+        'table' => 'aset',
+        'columns' => ['nama_aset', 'kategori_aset', 'kondisi', 'tanggal_masuk'],
+        'col_date' => 'tanggal_masuk',
+        'extra_where' => ''
+    ],
+    'Laporan Kerusakan' => [
+        'table' => 'kerusakan',
+        'columns' => ['id_aset', 'status', 'tanggal'],
+        'col_date' => 'tanggal',
+        'extra_where' => ''
+    ],
+    'Laporan Perawatan' => [
+        'table' => 'perawatan',
+        'columns' => ['nama_aset', 'status', 'tanggal'],
+        'col_date' => 'tanggal',
+        'extra_where' => ''
+    ],
+    'Laporan Perbaikan' => [
+        'table' => 'kerusakan',
+        'columns' => ['id_aset', 'status', 'tanggal'],
+        'col_date' => 'tanggal',
+        'extra_where' => "status IN ('Dalam Perbaikan','Selesai Diperbaiki')"
+    ],
+    'Laporan Perawatan Berjalan' => [
+        'table' => 'perawatan',
+        'columns' => ['nama_aset', 'status', 'tanggal'],
+        'col_date' => 'tanggal',
+        'extra_where' => "status IN ('Belum Dimulai','Sedang Proses')"
+    ],
+    'Laporan Peminjaman Aset' => [
+        'table' => 'peminjaman',
+        // Pastikan kolom ini ada di tabel peminjaman
+        'columns' => ['id_aset', 'tanggal', 'status'],
+        'col_date' => 'tanggal',
+        'extra_where' => ''
+    ],
+    'Laporan Hasil Audit Fisik' => [
+        'table' => 'audit_fisik',
+        'columns' => ['id_aset', 'auditor', 'kondisi_fisik', 'tanggal_audit'],
+        'col_date' => 'tanggal_audit',
+        'extra_where' => ''
+    ],
+    'Laporan Rekapitulasi Nilai Aset' => [
+        'table' => 'aset',
+        // Pastikan ada kolom harga di tabel aset
+        'columns' => ['nama_aset', 'kategori_aset', 'harga', 'tanggal_masuk'],
+        'col_date' => 'tanggal_masuk',
+        'extra_where' => "harga > 0"
+    ],
+    'Laporan Kalibrasi' => [
+        'table' => 'perawatan',
+        'columns' => ['nama_aset', 'status', 'tanggal'],
+        'col_date' => 'tanggal',
+        'extra_where' => ''
+    ],
+    'Laporan Pelacakan Lokasi Aset' => [
+        'table' => 'aset',
+        // Pastikan ada kolom lokasi di tabel aset
+        'columns' => ['nama_aset', 'lokasi', 'kategori_aset', 'tanggal_masuk'],
+        'col_date' => 'tanggal_masuk',
+        'extra_where' => ''
+    ]
 ];
 
-// ==== SORTING SUPAYA TERBARU DI ATAS ==== //
-$sortKey = [
-    "aset"       => "tanggal_masuk",
-    "kerusakan"  => "tanggal",
-    "perawatan"  => "tanggal",
-    "perbaikan"  => "tanggal",
-    "pengguna"   => "nama_pengguna"
-];
-
-// ==== LAPORAN ==== //
-$laporan_semua = [
-    ['Laporan Aset', "aset"],
-    ['Laporan Kerusakan', "kerusakan"],
-    ['Laporan Perawatan', "perawatan"],
-    ['Laporan Perbaikan', "perbaikan"],
-    ['Laporan Perawatan Berjalan', "perawatan", "WHERE status IN ('Belum Dimulai','Sedang Proses')"],
-    ['Laporan Manajemen User', "pengguna"]
-];
-
-// Ambil filter GET
-$search       = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
-$statusFilter = isset($_GET['status']) ? mysqli_real_escape_string($koneksi, $_GET['status']) : '';
-$dari         = isset($_GET['dari']) ? mysqli_real_escape_string($koneksi, $_GET['dari']) : '';
-$sampai       = isset($_GET['sampai']) ? mysqli_real_escape_string($koneksi, $_GET['sampai']) : '';
-
-$whereKerusakan = [];
-if ($search !== '') $whereKerusakan[] = "(nama_aset LIKE '%$search%' OR keterangan LIKE '%$search%')";
-if ($statusFilter !== '') $whereKerusakan[] = "status = '$statusFilter'";
-if ($dari !== '') $whereKerusakan[] = "tanggal >= '$dari'";
-if ($sampai !== '') $whereKerusakan[] = "tanggal <= '$sampai'";
-$whereKerusakanSQL = count($whereKerusakan) ? 'WHERE ' . implode(' AND ', $whereKerusakan) : '';
-
-// ==== LOOP LAPORAN ==== //
-foreach ($laporan_semua as $lap) {
+foreach ($laporan_data as $title => $info) {
+    // Judul tiap bagian laporan
     $pdf->SetFont('Arial', 'B', 11);
-    $pdf->Cell(0, 7, strtoupper($lap[0]), 0, 1);
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->Cell(0, 10, strtoupper($title), 0, 1, 'L');
 
-    $tableName = $lap[1];
-    $filter = $lap[2] ?? "";
-
-    // Khusus kerusakan, pakai filter GET
-    if ($tableName == 'kerusakan' && empty($lap[2])) {
-        $filter = $whereKerusakanSQL;
+    // Susun Query beserta kondisi filternya
+    $conditions = [];
+    if (!empty($tahun_filter)) {
+        $conditions[] = "YEAR(" . $info['col_date'] . ") = '$tahun_filter'";
+    }
+    if (!empty($info['extra_where'])) {
+        $conditions[] = $info['extra_where'];
     }
 
-    // ==== LAPORAN MANAJEMEN USER KHUSUS ==== //
-    if ($tableName == 'pengguna') {
+    $whereClause = count($conditions) > 0 ? "WHERE " . implode(" AND ", $conditions) : "";
+    $query = mysqli_query($koneksi, "SELECT * FROM " . $info['table'] . " $whereClause");
 
-        // Query urut berdasarkan id_pengguna (kolom yang benar)
-        $query = "SELECT * FROM pengguna ORDER BY id_pengguna DESC";
-        $result = mysqli_query($koneksi, $query);
-
-        $pdf->SetFont('Arial', 'B', 12);
-        $pdf->Ln(2);
-        if ($pdf->GetY() > 170) $pdf->AddPage();
-
-        // Header tabel
-        $columns = ['No', 'Nama Pengguna', 'Username', 'Level', 'Role', 'Status'];
-        $colWidth = 260 / count($columns);
-
-        $pdf->SetFillColor(72, 201, 176); // Header warna hijau
-        $pdf->SetTextColor(255);          // Teks putih
-        $pdf->SetFont('Arial', 'B', 9);
-
-        foreach ($columns as $col) {
-            $pdf->Cell($colWidth, 8, $col, 1, 0, 'C', true);
-        }
-        $pdf->Ln();
-
-        // Data tabel
-        $pdf->SetFont('Arial', '', 9);
-        $pdf->SetTextColor(0);
-
-        if (!$result || mysqli_num_rows($result) == 0) {
-            $pdf->Cell(260, 8, 'Tidak ada data tersedia.', 1, 1, 'C');
-        } else {
-            $no = 1;
-            while ($row = mysqli_fetch_assoc($result)) {
-
-                // 1 baris per user → tabel rapi
-                $pdf->Cell($colWidth, 7, $no, 1, 0, 'C');
-                $pdf->Cell($colWidth, 7, $row['nama_pengguna'], 1, 0, 'C');
-                $pdf->Cell($colWidth, 7, $row['username'], 1, 0, 'C');
-                $pdf->Cell($colWidth, 7, $row['level'], 1, 0, 'C');
-                $pdf->Cell($colWidth, 7, $row['role'], 1, 0, 'C');
-                $pdf->Cell($colWidth, 7, $row['status'], 1, 0, 'C');
-
-                $pdf->Ln();
-                $no++;
-            }
-        }
-
-        $pdf->Ln(10);
+    if (!$query) {
+        $pdf->SetFont('Arial', 'I', 9);
+        $pdf->Cell(260, 7, 'Gagal memuat data / Tabel belum sesuai', 1, 1, 'C');
+        $pdf->Ln(5);
         continue;
     }
 
-    // ==== LAPORAN LAINNYA ==== //
-    $queryColumns = mysqli_query($koneksi, "SHOW COLUMNS FROM $tableName");
-    $actualCols   = array_column(mysqli_fetch_all($queryColumns, MYSQLI_ASSOC), 'Field');
-    $columns      = isset($customOrder[$tableName]) ? array_values(array_intersect($customOrder[$tableName], $actualCols)) : $actualCols;
-    array_unshift($columns, 'no');
-
-    // Header tabel
-    $colWidth = 260 / count($columns);
-    $pdf->SetFillColor(72, 201, 176); // Header warna hijau untuk semua laporan
-    $pdf->SetTextColor(255);
+    // ==== HEADER TABEL BERWARNA ==== //
     $pdf->SetFont('Arial', 'B', 9);
-    foreach ($columns as $col) {
-        $label = ($col == 'no') ? 'No' : ucfirst(str_replace('_', ' ', $col));
+    // Warna background (Teal / Hijau Gelap) menyesuaikan dashboard
+    $pdf->SetFillColor(44, 122, 123);
+    // Warna teks putih
+    $pdf->SetTextColor(255, 255, 255);
+
+    $colWidth = 260 / count($info['columns']);
+    foreach ($info['columns'] as $col) {
+        // Hapus underscore jadi spasi biar rapi, misal 'nama_aset' jadi 'NAMA ASET'
+        $label = strtoupper(str_replace('_', ' ', $col));
+        // Tambahkan "true" di akhir agar warna background (Fill) aktif
         $pdf->Cell($colWidth, 8, $label, 1, 0, 'C', true);
     }
     $pdf->Ln();
 
-    // Sorting query untuk masing-masing tabel
-    if ($tableName == 'aset') {
-        // Ambil data aset persis urutan di database
-        $query = "SELECT * FROM aset ORDER BY tanggal_masuk DESC, id_aset DESC";
-    } elseif ($tableName == 'perbaikan') {
-        $query = "SELECT * FROM kerusakan
-              WHERE status IN ('Dalam Perbaikan', 'Selesai Diperbaiki')
-              $filter
-              ORDER BY tanggal DESC, id DESC";
-    } elseif ($tableName == 'kerusakan') {
-        $query = "SELECT * FROM kerusakan 
-              $filter 
-              ORDER BY tanggal DESC, id DESC";
-    } else {
-        $orderColumn = $sortKey[$tableName] ?? $actualCols[0];
-        $query = "SELECT * FROM $tableName 
-              $filter 
-              ORDER BY $orderColumn DESC";
-    }
-
-
-    $result = mysqli_query($koneksi, $query);
-
-    // Data tabel
+    // ==== ISI TABEL ==== //
     $pdf->SetFont('Arial', '', 9);
-    $pdf->SetTextColor(0);
-    if (!$result || mysqli_num_rows($result) == 0) {
-        $pdf->Cell(260, 8, 'Tidak ada data tersedia.', 1, 1, 'C');
+    $pdf->SetTextColor(0, 0, 0); // Kembalikan warna teks ke hitam
+
+    if (mysqli_num_rows($query) == 0) {
+        $pdf->Cell(260, 8, 'Tidak ada data pada periode ini', 1, 1, 'C');
     } else {
-        $no = 1;
-        while ($row = mysqli_fetch_assoc($result)) {
-            foreach ($columns as $col) {
-                $value = ($col == 'no') ? $no : ($row[$col] ?? '-');
-                $pdf->Cell($colWidth, 7, mb_substr($value, 0, 40), 1, 0, 'C');
+        while ($row = mysqli_fetch_assoc($query)) {
+            foreach ($info['columns'] as $col) {
+                // Cek jika datanya kosong, beri tanda strip (-)
+                $isi = !empty($row[$col]) ? $row[$col] : '-';
+
+                // Format rupiah khusus kalau nama kolomnya 'harga'
+                if ($col == 'harga' && is_numeric($isi)) {
+                    $isi = 'Rp ' . number_format($isi, 0, ',', '.');
+                }
+
+                $pdf->Cell($colWidth, 7, substr($isi, 0, 40), 1, 0, 'C');
             }
             $pdf->Ln();
-            $no++;
         }
     }
-    $pdf->Ln(10);
+    $pdf->Ln(8); // Jarak antar tabel
 }
 
-// ==================== TANDA TANGAN ==================== //
-$pdf->Ln(10);
-$pdf->SetFont('Arial', '', 11);
-$pdf->Cell(0, 6, 'Banjarmasin, ' . date('d F Y'), 0, 1, 'R');
-$pdf->Cell(0, 6, 'Mengetahui,', 0, 1, 'R');
-$pdf->Ln(8);
-
-// Jika ada gambar tanda tangan kepala RS bisa ditambahkan
-// $ttdPath = realpath(__DIR__ . '/../assets/img/ttd_kepala.png');
-// if ($ttdPath && file_exists($ttdPath)) {
-//     $yPos = $pdf->GetY();
-//     $pdf->Image($ttdPath, 230, $yPos, 35);
-//     $pdf->Ln(25);
-// }
-
-$pdf->SetFont('Arial', 'B', 11);
-$pdf->Cell(0, 6, 'Administrator', 0, 1, 'R'); // ganti Kepala RS jadi Administrator
-$pdf->Ln(5);
-
-// Footer tambahan
-$pdf->SetFont('Arial', 'I', 9);
-$pdf->Cell(0, 6, 'Dicetak pada: ' . date('d-m-Y H:i:s') . ' oleh ' . ($_SESSION['nama_pengguna'] ?? 'User'), 0, 1, 'R');
-
-
-// Output PDF
-$pdf->Output('I', 'Semua_Laporan_' . date('Ymd_His') . '.pdf');
+$pdf->Output();
