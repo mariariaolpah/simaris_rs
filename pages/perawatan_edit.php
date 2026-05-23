@@ -20,19 +20,36 @@ if (isset($_POST['update'])) {
     $nama_aset     = mysqli_real_escape_string($koneksi, $_POST['nama_aset']);
     $teknisi       = mysqli_real_escape_string($koneksi, $_POST['teknisi']);
     $tanggal       = mysqli_real_escape_string($koneksi, $_POST['tanggal']);
-    $tgl_kalibrasi = mysqli_real_escape_string($koneksi, $_POST['tanggal_kalibrasi_berikutnya']);
     $status        = mysqli_real_escape_string($koneksi, $_POST['status']);
 
-    $update = mysqli_query($koneksi, "UPDATE perawatan SET teknisi='$teknisi', tanggal='$tanggal', tanggal_kalibrasi_berikutnya='$tgl_kalibrasi', status='$status' WHERE id=$id");
+    // [PERBAIKAN ERROR TANGGAL] 
+    // Jika input tanggal kosong, atur nilainya jadi NULL di database agar tidak error
+    $tgl_k_input   = $_POST['tanggal_kalibrasi_berikutnya'];
+    $tgl_kalibrasi = !empty($tgl_k_input) ? "'" . mysqli_real_escape_string($koneksi, $tgl_k_input) . "'" : "NULL";
 
-    // Sinkronisasi otomatis ke tabel master aset berdasarkan status
+    // Update tabel perawatan
+    $update = mysqli_query($koneksi, "UPDATE perawatan SET 
+        teknisi='$teknisi', 
+        petugas_kalibrasi='$teknisi', 
+        tanggal='$tanggal', 
+        tanggal_kalibrasi_berikutnya=$tgl_kalibrasi, 
+        status='$status' 
+        WHERE id=$id");
+
+    // ================= AUTO SYNC KE TABEL MASTER DAN TABEL KERUSAKAN USER =================
     if ($update) {
         if ($status == "Selesai") {
             mysqli_query($koneksi, "UPDATE aset SET kondisi='Baik' WHERE nama_aset='$nama_aset'");
+
+            // Sinkronkan data di riwayat user (tabel kerusakan) menjadi Selesai juga!
+            mysqli_query($koneksi, "UPDATE kerusakan SET status='Selesai Diperbaiki' WHERE nama_aset='$nama_aset' AND teknisi='Ahmad Fauzi' AND status!='Selesai Diperbaiki'");
         } else {
             mysqli_query($koneksi, "UPDATE aset SET kondisi='Perlu Perawatan' WHERE nama_aset='$nama_aset'");
+
+            // Sinkronkan data di riwayat user menjadi Sedang Proses
+            mysqli_query($koneksi, "UPDATE kerusakan SET status='Dalam Perbaikan' WHERE nama_aset='$nama_aset' AND teknisi='Ahmad Fauzi' AND status!='Selesai Diperbaiki'");
         }
-        echo "<script>alert('Data perawatan berhasil diperbarui!');window.location='perawatan.php';</script>";
+        echo "<script>alert('Data perawatan & kalibrasi berhasil diperbarui!');window.location='perawatan.php';</script>";
     } else {
         echo "<script>alert('Gagal mengupdate data!');</script>";
     }
@@ -99,12 +116,6 @@ if (isset($_POST['update'])) {
             border: 1px solid #cbd5e1;
         }
 
-        .form-control:focus,
-        .form-select:focus {
-            border-color: #2c7a7b;
-            box-shadow: 0 0 0 0.2rem rgba(44, 122, 123, 0.25);
-        }
-
         .btn-success {
             background: linear-gradient(90deg, #2c7a7b, #1cc88a);
             border: none;
@@ -120,8 +131,16 @@ if (isset($_POST['update'])) {
 
 <body>
     <div id="wrapper">
+        <?php
+        $nama_user_aktif = strtolower($_SESSION['nama_pengguna'] ?? '');
+        $is_teknisi = (strpos($nama_user_aktif, 'budi') !== false || strpos($nama_user_aktif, 'ahmad') !== false);
 
-        <?php include(__DIR__ . '/../sidebar.php'); ?>
+        if ($is_teknisi) {
+            include(__DIR__ . '/sidebar_teknisi.php');
+        } else {
+            include(__DIR__ . '/../sidebar.php');
+        }
+        ?>
 
         <div id="page-content-wrapper">
             <div class="container-form">
@@ -134,12 +153,11 @@ if (isset($_POST['update'])) {
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Nama Aset</label>
                                 <input type="text" name="nama_aset" class="form-control bg-light" value="<?= htmlspecialchars($p['nama_aset']) ?>" required readonly>
-                                <small class="text-muted">Nama aset dikunci agar riwayat perawatan tidak tertukar.</small>
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold">Nama Teknisi / Vendor</label>
-                                <input type="text" name="teknisi" class="form-control" value="<?= htmlspecialchars($p['teknisi']) ?>" required>
+                                <label class="form-label fw-bold">Nama Teknisi / Petugas Kalibrasi</label>
+                                <input type="text" name="teknisi" class="form-control bg-light text-primary fw-bold" value="Ahmad Fauzi" readonly required>
                             </div>
 
                             <div class="row">
@@ -149,7 +167,7 @@ if (isset($_POST['update'])) {
                                 </div>
                                 <div class="col-md-6 mb-4">
                                     <label class="form-label fw-bold text-danger">Jadwal Kalibrasi Berikutnya</label>
-                                    <input type="date" name="tanggal_kalibrasi_berikutnya" class="form-control border-danger" value="<?= htmlspecialchars($p['tanggal_kalibrasi_berikutnya']) ?>">
+                                    <input type="date" name="tanggal_kalibrasi_berikutnya" class="form-control border-danger" value="<?= htmlspecialchars($p['tanggal_kalibrasi_berikutnya'] == '0000-00-00' ? '' : $p['tanggal_kalibrasi_berikutnya']) ?>">
                                 </div>
                             </div>
 
@@ -176,7 +194,6 @@ if (isset($_POST['update'])) {
                                     </a>
                                 </div>
                             </div>
-
                         </form>
                     </div>
                 </div>

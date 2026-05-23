@@ -19,29 +19,55 @@ include(__DIR__ . '/../config/koneksi.php');
 $aset = mysqli_query($koneksi, "SELECT * FROM aset ORDER BY nama_aset ASC");
 
 if (isset($_POST['simpan'])) {
-    // Ambil input dan amankan dengan mysqli_real_escape_string
+    // Ambil input dan amankan
     $nama_aset  = mysqli_real_escape_string($koneksi, $_POST['nama_aset']);
     $status     = mysqli_real_escape_string($koneksi, $_POST['status']);
     $keterangan = mysqli_real_escape_string($koneksi, $_POST['keterangan']);
-
     $tanggal    = date('Y-m-d');
-
-    // Ambil nama pelapor dari session user yang sedang login
     $pelapor    = mysqli_real_escape_string($koneksi, $_SESSION['nama_pengguna']);
-
-    // Set sumber pelaporan otomatis menjadi App User
     $sumber     = 'App User';
 
-    // Tambahkan pelapor dan sumber ke dalam query insert
-    $query = mysqli_query($koneksi, "
-        INSERT INTO kerusakan (nama_aset, tanggal, status, keterangan, pelapor, sumber) 
-        VALUES ('$nama_aset', '$tanggal', '$status', '$keterangan', '$pelapor', '$sumber')
-    ");
+    // ================= LOGIKA SMART ROUTING (PEMISAHAN TUGAS OTOMATIS) ================= //
 
-    if ($query) {
-        echo "<script>alert('Laporan berhasil dikirim!'); window.location='user_data_kerusakan.php';</script>";
+    if ($status == 'Perlu Perawatan') {
+        // ---- 1. JALUR PERAWATAN (Masuk ke tabel perawatan untuk AHMAD FAUZI) ----
+        $teknisi_p = 'Ahmad Fauzi';
+        $status_awal = 'Belum Dimulai'; // Status default di tabel perawatan
+
+        // Insert ke tabel perawatan (Ahmad Fauzi akan melihat ini di dashboardnya)
+        $query = mysqli_query($koneksi, "
+            INSERT INTO perawatan (nama_aset, teknisi, petugas_kalibrasi, tanggal, status) 
+            VALUES ('$nama_aset', '$teknisi_p', '$teknisi_p', '$tanggal', '$status_awal')
+        ");
+
+        if ($query) {
+            // Update kondisi aset utama
+            mysqli_query($koneksi, "UPDATE aset SET kondisi = 'Perlu Perawatan' WHERE nama_aset = '$nama_aset'");
+            echo "<script>alert('Laporan berhasil dikirim! Laporan diteruskan ke tim Perawatan (Ahmad Fauzi).'); window.location='user_data_kerusakan.php';</script>";
+        } else {
+            echo "<script>alert('Gagal meneruskan laporan ke data perawatan!');</script>";
+        }
     } else {
-        echo "<script>alert('Gagal menambahkan laporan!');</script>";
+        // ---- 2. JALUR PERBAIKAN KERUSAKAN (Masuk ke tabel kerusakan untuk BUDI SETIAWAN) ----
+        $teknisi_k = 'Budi Setiawan';
+
+        // Insert ke tabel kerusakan (Budi Setiawan akan melihat ini di dashboardnya)
+        $query = mysqli_query($koneksi, "
+            INSERT INTO kerusakan (nama_aset, tanggal, status, keterangan, pelapor, sumber, teknisi) 
+            VALUES ('$nama_aset', '$tanggal', '$status', '$keterangan', '$pelapor', '$sumber', '$teknisi_k')
+        ");
+
+        if ($query) {
+            // Sinkronisasi stok kerusakan otomatis
+            if ($status == "Rusak") {
+                mysqli_query($koneksi, "UPDATE aset SET stok_tersedia = stok_tersedia - 1, stok_rusak = stok_rusak + 1 WHERE nama_aset = '$nama_aset'");
+            } elseif ($status == "Dalam Perbaikan") {
+                mysqli_query($koneksi, "UPDATE aset SET stok_tersedia = stok_tersedia - 1, stok_perawatan = stok_perawatan + 1 WHERE nama_aset = '$nama_aset'");
+            }
+            echo "<script>alert('Laporan berhasil dikirim! Laporan diteruskan ke tim Perbaikan (Budi Setiawan).'); window.location='user_data_kerusakan.php';</script>";
+        } else {
+            echo "<script>alert('Gagal meneruskan laporan ke data kerusakan!');</script>";
+        }
     }
 }
 ?>
@@ -104,12 +130,12 @@ if (isset($_POST['simpan'])) {
     <?php include __DIR__ . '/sidebar_user.php'; ?>
 
     <div id="page-content-wrapper">
-        <h4 class="fw-bold text-dark mb-4">Buat Laporan Kerusakan</h4>
+        <h4 class="fw-bold text-dark mb-4">Buat Laporan / Pengaduan Aset</h4>
 
         <div class="container-form">
             <div class="card">
                 <div class="card-header">
-                    <i class="bi bi-bug"></i> Laporan Kerusakan Aset
+                    <i class="bi bi-bug"></i> Form Laporan Kendala Aset
                 </div>
 
                 <div class="card-body">
@@ -134,20 +160,19 @@ if (isset($_POST['simpan'])) {
                                     </option>
                                 <?php endwhile; ?>
                             </select>
-                            <div class="form-text text-muted"><i class="bi bi-geo-alt"></i> Perhatikan ruangan lokasi alat agar tidak salah melapor.</div>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Status Kerusakan</label>
+                            <label class="form-label fw-bold">Kategori Kendala</label>
                             <select name="status" class="form-select" required>
-                                <option value="Rusak">Rusak (Mati Total / Berat)</option>
-                                <option value="Perlu Perawatan">Perlu Perawatan (Malfungsi Ringan)</option>
-                                <option value="Dalam Perbaikan">Dalam Perbaikan</option>
+                                <option value="Rusak">Rusak (Mati Total / Berat) - Tim Perbaikan</option>
+                                <option value="Perlu Perawatan">Perlu Perawatan (Malfungsi Ringan) - Tim Pemeliharaan</option>
                             </select>
+                            <div class="form-text text-primary fw-medium"><i class="bi bi-arrow-split"></i> Pemilihan status ini akan menentukan teknisi mana yang menangani.</div>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Keterangan / Rincian Kerusakan</label>
+                            <label class="form-label fw-bold">Keterangan / Rincian Kendala</label>
                             <textarea name="keterangan" class="form-control" rows="4" placeholder="Jelaskan detail kerusakan alat secara singkat..." required></textarea>
                         </div>
 

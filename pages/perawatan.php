@@ -22,13 +22,22 @@ $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
 $offset = ($page - 1) * $limit;
 
-// SEARCH & KATEGORI
+// MENGAMBIL PARAMETER FILTER DARI URL
 $search = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : "";
 $kategori_filter = isset($_GET['kategori']) ? $_GET['kategori'] : 'semua';
+$tahun_filter = isset($_GET['tahun']) ? (int)$_GET['tahun'] : "";
+$status_filter = isset($_GET['status']) ? mysqli_real_escape_string($koneksi, $_GET['status']) : "";
 
 $whereConditions = [];
 
-// Jika ada pencarian (Ditambahkan pencarian untuk petugas_kalibrasi)
+// === FILTER OTOMATIS BERDASARKAN ROLE TEKNISI (AHMAD FAUZI) ===
+$nama_user_aktif = $_SESSION['nama_pengguna'] ?? '';
+if (strpos(strtolower($nama_user_aktif), 'ahmad') !== false) {
+    // Hanya menampilkan data di mana Ahmad bertindak sebagai Teknisi Perawatan atau Petugas Kalibrasi
+    $whereConditions[] = "(p.teknisi LIKE '%ahmad%' OR p.petugas_kalibrasi LIKE '%ahmad%')";
+}
+
+// FILTER PENCARIAN
 if ($search != '') {
     $whereConditions[] = "(p.nama_aset LIKE '%$search%' 
         OR p.teknisi LIKE '%$search%' 
@@ -38,17 +47,33 @@ if ($search != '') {
         OR a.kategori_aset LIKE '%$search%')";
 }
 
-// Jika ada filter tab kategori
+// FILTER KATEGORI TAB
 if ($kategori_filter == 'medis') {
     $whereConditions[] = "a.kategori_aset = 'Medis'";
 } elseif ($kategori_filter == 'non-medis') {
     $whereConditions[] = "a.kategori_aset = 'Non-Medis'";
 }
 
+// FILTER TAHUN
+if (!empty($tahun_filter)) {
+    $whereConditions[] = "YEAR(p.tanggal) = $tahun_filter";
+}
+
+// FILTER STATUS
+if ($status_filter != '') {
+    $whereConditions[] = "p.status = '$status_filter'";
+}
+
 $whereClause = "";
 if (count($whereConditions) > 0) {
     $whereClause = "WHERE " . implode(" AND ", $whereConditions);
 }
+
+// HELPER URL PARAMETERS (Agar filter tidak hilang saat ganti halaman / tab)
+$url_params = "";
+if ($search != '') $url_params .= '&search=' . urlencode($search);
+if ($tahun_filter != '') $url_params .= '&tahun=' . urlencode($tahun_filter);
+if ($status_filter != '') $url_params .= '&status=' . urlencode($status_filter);
 
 // ================= QUERY DATA (JOIN ASET FIX COLLATION) ================= //
 $count_query = mysqli_query($koneksi, "
@@ -127,6 +152,8 @@ $query = mysqli_query($koneksi, "
             border-top-left-radius: 12px;
             border-top-right-radius: 12px;
             padding: 15px 20px;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .nav-tabs {
@@ -185,6 +212,13 @@ $query = mysqli_query($koneksi, "
                 opacity: 0.3;
             }
         }
+
+        .filter-select {
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            padding: 0.25rem 0.5rem;
+        }
     </style>
 </head>
 
@@ -192,7 +226,19 @@ $query = mysqli_query($koneksi, "
 
     <div id="wrapper">
 
-        <?php include(__DIR__ . '/../sidebar.php'); ?>
+        <?php
+        // Mendeteksi apakah user yang login adalah teknisi
+        $nama_user_aktif = strtolower($_SESSION['nama_pengguna'] ?? '');
+        $is_teknisi = (strpos($nama_user_aktif, 'budi') !== false || strpos($nama_user_aktif, 'ahmad') !== false);
+
+        if ($is_teknisi) {
+            // Jika teknisi, tampilkan sidebar khusus teknisi dari dalam folder pages
+            include(__DIR__ . '/sidebar_teknisi.php');
+        } else {
+            // Jika bukan (misal admin), tampilkan sidebar default
+            include(__DIR__ . '/../sidebar.php');
+        }
+        ?>
 
         <div id="page-content-wrapper">
 
@@ -208,29 +254,56 @@ $query = mysqli_query($koneksi, "
 
                 <div class="card">
 
-                    <div class="card-header">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
 
-                        <span><i class="bi bi-calendar-check"></i> Data Perawatan & Jadwal Kalibrasi</span>
+                        <div class="d-flex align-items-center fw-medium">
+                            <i class="bi bi-calendar-check me-2"></i> Data Perawatan & Jadwal Kalibrasi
+                        </div>
 
-                        <div class="d-flex gap-2">
+                        <div class="d-flex gap-2 flex-wrap align-items-center ms-auto">
 
-                            <form method="GET" class="d-flex gap-2">
+                            <form method="GET" class="d-flex gap-1 align-items-center m-0">
+
                                 <input type="hidden" name="kategori" value="<?= htmlspecialchars($kategori_filter) ?>">
-                                <input type="text" name="search" class="form-control form-control-sm"
+
+                                <select name="status" class="form-select text-dark filter-select" style="min-width: 140px;">
+                                    <option value="">Semua Status</option>
+                                    <option value="Belum Dimulai" <?= ($status_filter == 'Belum Dimulai') ? 'selected' : '' ?>>Belum Dimulai</option>
+                                    <option value="Sedang Proses" <?= ($status_filter == 'Sedang Proses') ? 'selected' : '' ?>>Sedang Proses</option>
+                                    <option value="Selesai" <?= ($status_filter == 'Selesai') ? 'selected' : '' ?>>Selesai</option>
+                                </select>
+
+                                <select name="tahun" class="form-select text-dark filter-select" style="min-width: 130px;">
+                                    <option value="">Semua Tahun</option>
+                                    <?php
+                                    $thn_skrg = date('Y');
+                                    for ($thn = $thn_skrg; $thn >= ($thn_skrg - 10); $thn--) {
+                                        $selected = ($tahun_filter == $thn) ? 'selected' : '';
+                                        echo "<option value='$thn' $selected>$thn</option>";
+                                    }
+                                    ?>
+                                </select>
+
+                                <input type="text"
+                                    name="search"
+                                    class="form-control text-dark filter-select"
+                                    placeholder="Cari aset..."
                                     value="<?= htmlspecialchars($search) ?>"
-                                    placeholder="Cari aset...">
-                                <button class="btn btn-secondary btn-sm">
+                                    style="min-width: 150px;">
+
+                                <button class="btn btn-secondary btn-sm" style="border-radius: 6px;">
                                     <i class="bi bi-search"></i>
                                 </button>
+
                             </form>
 
-                            <a href="perawatan_tambah.php" class="btn btn-light btn-sm text-dark">
-                                <i class="bi bi-plus-lg"></i> Tambah
+                            <a href="perawatan_tambah.php" class="btn btn-light btn-sm text-dark d-flex align-items-center" style="border-radius: 6px; height: 31px;">
+                                <i class="bi bi-plus-lg me-1"></i> Tambah
                             </a>
 
-                            <a href="perawatan_cetak.php<?= $search ? '?search=' . urlencode($search) : '' ?>"
-                                class="btn btn-danger btn-sm text-white" target="_blank">
-                                <i class="bi bi-file-earmark-pdf"></i> Cetak PDF
+                            <a href="perawatan_cetak.php?kategori=<?= urlencode($kategori_filter) ?><?= $url_params ?>"
+                                class="btn btn-danger btn-sm text-white d-flex align-items-center" target="_blank" style="border-radius: 6px; height: 31px;">
+                                <i class="bi bi-file-earmark-pdf me-1"></i> Cetak PDF
                             </a>
 
                         </div>
@@ -240,19 +313,19 @@ $query = mysqli_query($koneksi, "
                     <ul class="nav nav-tabs">
                         <li class="nav-item">
                             <a class="nav-link <?= ($kategori_filter == 'medis') ? 'active-medis' : '' ?>"
-                                href="?kategori=medis<?= $search ? '&search=' . urlencode($search) : '' ?>">
-                                🏥 Aset Medis
+                                href="?kategori=medis<?= $url_params ?>">
+                                🩺 Aset Medis
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link <?= ($kategori_filter == 'non-medis') ? 'active-nonmedis' : '' ?>"
-                                href="?kategori=non-medis<?= $search ? '&search=' . urlencode($search) : '' ?>">
-                                🪑 Aset Non-Medis
+                                href="?kategori=non-medis<?= $url_params ?>">
+                                🖥️ Aset Non-Medis
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link <?= ($kategori_filter == 'semua') ? 'active-semua' : '' ?>"
-                                href="?kategori=semua<?= $search ? '&search=' . urlencode($search) : '' ?>">
+                                href="?kategori=semua<?= $url_params ?>">
                                 📋 Semua Aset
                             </a>
                         </li>
@@ -281,6 +354,7 @@ $query = mysqli_query($koneksi, "
                                 <?php if (mysqli_num_rows($query) == 0): ?>
                                     <tr>
                                         <td colspan="10" class="py-5 text-center text-muted">
+                                            <i class="bi bi-inboxes d-block mb-2" style="font-size: 2rem;"></i>
                                             Tidak ada jadwal perawatan / kalibrasi di kategori ini.
                                         </td>
                                     </tr>
@@ -371,13 +445,13 @@ $query = mysqli_query($koneksi, "
                                 <nav>
                                     <ul class="pagination pagination-sm mb-0">
                                         <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
-                                            <a class="page-link" href="?kategori=<?= urlencode($kategori_filter) ?>&page=<?= $page - 1 ?><?= $search ? '&search=' . urlencode($search) : '' ?>">Prev</a>
+                                            <a class="page-link" href="?kategori=<?= urlencode($kategori_filter) ?>&page=<?= $page - 1 ?><?= $url_params ?>">Prev</a>
                                         </li>
                                         <li class="page-item disabled">
                                             <span class="page-link"><?= $page ?> / <?= $total_page ?></span>
                                         </li>
                                         <li class="page-item <?= ($page >= $total_page) ? 'disabled' : '' ?>">
-                                            <a class="page-link" href="?kategori=<?= urlencode($kategori_filter) ?>&page=<?= $page + 1 ?><?= $search ? '&search=' . urlencode($search) : '' ?>">Next</a>
+                                            <a class="page-link" href="?kategori=<?= urlencode($kategori_filter) ?>&page=<?= $page + 1 ?><?= $url_params ?>">Next</a>
                                         </li>
                                     </ul>
                                 </nav>

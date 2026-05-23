@@ -22,7 +22,9 @@ if (isset($_POST['update'])) {
     $tanggal     = mysqli_real_escape_string($koneksi, $_POST['tanggal']);
     $keterangan  = mysqli_real_escape_string($koneksi, $_POST['keterangan']);
     $pelapor     = mysqli_real_escape_string($koneksi, $_POST['pelapor']);
-    $teknisi     = mysqli_real_escape_string($koneksi, $_POST['teknisi']);
+
+    // [MODIFIKASI] Teknisi dikunci ke Budi Setiawan
+    $teknisi     = 'Budi Setiawan';
 
     $status_lama = $k['status']; // Tangkap status sebelum diubah
 
@@ -36,18 +38,15 @@ if (isset($_POST['update'])) {
                     teknisi='$teknisi' 
                     WHERE id=$id");
 
-    // [MODIFIKASI] SINKRONISASI STOK OTOMATIS BERDASARKAN PERUBAHAN STATUS
+    // SINKRONISASI STOK OTOMATIS BERDASARKAN PERUBAHAN STATUS
     if ($update_query) {
-        // Jika statusnya berubah (misal dari Rusak menjadi Selesai Diperbaiki)
         if ($status_lama != $status_baru) {
-
             // 1. Cabut/Kurangi angka dari kategori stok yang LAMA
             if ($status_lama == "Rusak") {
                 mysqli_query($koneksi, "UPDATE aset SET stok_rusak = stok_rusak - 1 WHERE nama_aset='$nama_aset'");
             } elseif ($status_lama == "Perlu Perawatan" || $status_lama == "Dalam Perbaikan") {
                 mysqli_query($koneksi, "UPDATE aset SET stok_perawatan = stok_perawatan - 1 WHERE nama_aset='$nama_aset'");
             } elseif ($status_lama == "Selesai Diperbaiki") {
-                // Jaga-jaga kalau barang yang sudah selesai ternyata rusak lagi saat di edit
                 mysqli_query($koneksi, "UPDATE aset SET stok_tersedia = stok_tersedia - 1 WHERE nama_aset='$nama_aset'");
             }
 
@@ -61,7 +60,7 @@ if (isset($_POST['update'])) {
             }
         }
 
-        echo "<script>alert('Data laporan dan stok berhasil diperbarui!');window.location='kerusakan.php';</script>";
+        echo "<script>alert('Data laporan perbaikan berhasil diperbarui!');window.location='kerusakan.php';</script>";
     } else {
         echo "<script>alert('Gagal memperbarui data kerusakan!');</script>";
     }
@@ -160,11 +159,17 @@ if (isset($_POST['update'])) {
 
 <body>
     <div id="wrapper">
-        <?php include(__DIR__ . '/../sidebar.php'); ?>
+        <?php
+        if (isset($_SESSION['level']) && $_SESSION['level'] == 'teknisi') {
+            include(__DIR__ . '/sidebar_teknisi.php');
+        } else {
+            include(__DIR__ . '/../sidebar.php');
+        }
+        ?>
 
         <div id="page-content-wrapper">
             <div class="dashboard-header">
-                <h4 class="fw-bold m-0"><i class="bi bi-pencil-square"></i> EDIT PELAPORAN KERUSAKAN</h4>
+                <h4 class="fw-bold m-0"><i class="bi bi-pencil-square"></i> EKSEKUSI PERBAIKAN ASET</h4>
                 <div class="small fw-medium">
                     <i class="bi bi-person-circle-fill"></i> <?= htmlspecialchars($_SESSION['nama_pengguna']); ?>
                 </div>
@@ -173,8 +178,8 @@ if (isset($_POST['update'])) {
             <div class="content">
                 <div class="card" style="max-width: 750px; margin: 0 auto;">
                     <div class="card-header">
-                        <i class="bi bi-file-earmark-diff-fill"></i>
-                        <span>Form Perbarui Status Pengaduan Kerusakan</span>
+                        <i class="bi bi-tools"></i>
+                        <span>Form Eksekusi & Update Status Perbaikan</span>
                     </div>
 
                     <div class="card-body p-4">
@@ -188,7 +193,7 @@ if (isset($_POST['update'])) {
                                 </div>
                                 <div class="col-md-6 mb-4">
                                     <label class="form-label">Nama Pelapor</label>
-                                    <input type="text" name="pelapor" class="form-control" value="<?= htmlspecialchars($k['pelapor'] ?? '') ?>" required>
+                                    <input type="text" name="pelapor" class="form-control bg-light" value="<?= htmlspecialchars($k['pelapor'] ?? '') ?>" required readonly>
                                 </div>
                             </div>
 
@@ -203,23 +208,13 @@ if (isset($_POST['update'])) {
                                     <select name="status" class="form-select border-danger" required>
                                         <option value="Rusak" <?= $k['status'] == 'Rusak' ? 'selected' : '' ?>>Rusak (Mati Total)</option>
                                         <option value="Perlu Perawatan" <?= $k['status'] == 'Perlu Perawatan' ? 'selected' : '' ?>>Perlu Perawatan</option>
-                                        <option value="Dalam Perbaikan" <?= $k['status'] == 'Dalam Perbaikan' ? 'selected' : '' ?>>Dalam Perbaikan</option>
+                                        <option value="Dalam Perbaikan" <?= $k['status'] == 'Dalam Perbaikan' ? 'selected' : '' ?>>Dalam Perbaikan / Diproses</option>
                                         <option value="Selesai Diperbaiki" <?= $k['status'] == 'Selesai Diperbaiki' ? 'selected' : '' ?>>Selesai Diperbaiki</option>
                                     </select>
                                 </div>
                                 <div class="col-md-4 mb-4">
                                     <label class="form-label">Ditangani Teknisi</label>
-                                    <select name="teknisi" class="form-select border-primary">
-                                        <option value="">-- Pilih Teknisi --</option>
-                                        <?php
-                                        // Menarik nama pengguna dengan level teknisi, lalu di-selected jika sesuai dengan yang di database
-                                        $query_teknisi = mysqli_query($koneksi, "SELECT nama_pengguna FROM pengguna WHERE level = 'teknisi' AND status = 'aktif'");
-                                        while ($t = mysqli_fetch_assoc($query_teknisi)) {
-                                            $selected = ($t['nama_pengguna'] == $k['teknisi']) ? 'selected' : '';
-                                            echo "<option value='" . htmlspecialchars($t['nama_pengguna']) . "' $selected>" . htmlspecialchars($t['nama_pengguna']) . "</option>";
-                                        }
-                                        ?>
-                                    </select>
+                                    <input type="text" name="teknisi" class="form-control bg-light text-primary fw-bold" value="Budi Setiawan" readonly required>
                                 </div>
                                 <div class="col-md-4 mb-4">
                                     <label class="form-label">Tanggal Pembaruan</label>
@@ -228,7 +223,7 @@ if (isset($_POST['update'])) {
                             </div>
 
                             <div class="mb-4">
-                                <label class="form-label">Rincian Keluhan / Catatan Hasil Penanganan Teknis</label>
+                                <label class="form-label">Catatan Hasil Penanganan Teknis</label>
                                 <textarea name="keterangan" class="form-control" rows="4" required><?= htmlspecialchars($k['keterangan']) ?></textarea>
                             </div>
 
@@ -237,7 +232,7 @@ if (isset($_POST['update'])) {
                             <div class="row g-2 mt-2">
                                 <div class="col-sm-8">
                                     <button type="submit" name="update" class="btn btn-success w-100 py-2 fw-bold" style="border-radius: 8px;">
-                                        <i class="bi bi-save-fill"></i> Perbarui Data Kerusakan
+                                        <i class="bi bi-save-fill"></i> Simpan Hasil Perbaikan
                                     </button>
                                 </div>
                                 <div class="col-sm-4">

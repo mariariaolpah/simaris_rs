@@ -319,7 +319,7 @@ $query = mysqli_query($koneksi, "
                                 <i class="bi bi-plus-lg"></i> Tambah
                             </a>
 
-                            <a href="audit_cetak.php?kategori=<?= $kategori_filter ?><?= $url_params ?>"
+                            <a href="audit_cetak.php?kategori=semua"
                                 class="btn btn-light btn-sm"
                                 style="border-radius: 6px;" target="_blank">
                                 <i class="bi bi-file-earmark-pdf"></i> Cetak PDF

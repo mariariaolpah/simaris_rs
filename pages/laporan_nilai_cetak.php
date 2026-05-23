@@ -88,7 +88,8 @@ if (mysqli_num_rows($result) > 0) {
 
         $nama_aset = $row['nama_aset'];
         $kategori  = $row['kategori_aset'] ?? '-';
-        $stok      = (int)($row['stok'] ?? 1);
+        // PERBAIKAN: Mengubah 'stok' menjadi 'total_stok'
+        $stok      = (int)($row['total_stok'] ?? 0);
         $harga_total = $row['harga'] * $stok; // Hitung berdasarkan stok
 
         $umur      = isset($row['umur_ekonomis']) ? (int)$row['umur_ekonomis'] : 0;

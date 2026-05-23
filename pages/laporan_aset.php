@@ -51,7 +51,6 @@ function formatTanggal($tanggal)
         vertical-align: middle;
     }
 
-    /* Tambahan style untuk thumbnail foto */
     .foto-thumbnail {
         width: 45px;
         height: 45px;
@@ -76,14 +75,14 @@ function formatTanggal($tanggal)
     $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
     $perPage = 10;
 
-    $search  = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
-    $kondisi = isset($_GET['kondisi']) ? mysqli_real_escape_string($koneksi, $_GET['kondisi']) : '';
-    $dari    = isset($_GET['dari']) ? mysqli_real_escape_string($koneksi, $_GET['dari']) : '';
-    $sampai  = isset($_GET['sampai']) ? mysqli_real_escape_string($koneksi, $_GET['sampai']) : '';
+    $search   = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
+    $kategori = isset($_GET['kategori']) ? mysqli_real_escape_string($koneksi, $_GET['kategori']) : '';
+    $dari     = isset($_GET['dari']) ? mysqli_real_escape_string($koneksi, $_GET['dari']) : '';
+    $sampai   = isset($_GET['sampai']) ? mysqli_real_escape_string($koneksi, $_GET['sampai']) : '';
 
     $where = [];
     if ($search !== '')   $where[] = "(nama_aset LIKE '%$search%' OR jenis LIKE '%$search%' OR tipe_aset LIKE '%$search%' OR lokasi LIKE '%$search%')";
-    if ($kondisi !== '')  $where[] = "kondisi = '$kondisi'";
+    if ($kategori !== '') $where[] = "kategori_aset = '$kategori'";
     if ($dari !== '')     $where[] = "tanggal_masuk >= '$dari'";
     if ($sampai !== '')   $where[] = "tanggal_masuk <= '$sampai'";
 
@@ -92,9 +91,9 @@ function formatTanggal($tanggal)
     $statQ = mysqli_query($koneksi, "
         SELECT 
             COUNT(*) as total_all,
-            SUM(kondisi='Baik') as total_baik,
-            SUM(kondisi='Perlu Perawatan') as total_perawatan,
-            SUM(kondisi='Rusak') as total_rusak
+            SUM(COALESCE(stok_tersedia, 0)) as total_tersedia,
+            SUM(COALESCE(stok_perawatan, 0)) as total_perawatan,
+            SUM(COALESCE(stok_rusak, 0)) as total_rusak
         FROM aset $whereSQL
     ");
     $stat = mysqli_fetch_assoc($statQ);
@@ -108,12 +107,11 @@ function formatTanggal($tanggal)
 
     <div class="d-flex justify-content-between align-items-center mb-3">
         <form class="d-flex gap-2 filter-form" method="GET" action="">
-            <input type="text" name="search" placeholder="Cari nomor/nama/lokasi..." value="<?= htmlspecialchars($search); ?>">
-            <select name="kondisi">
-                <option value="">Semua Kondisi</option>
-                <option value="Baik" <?= ($kondisi == 'Baik') ? 'selected' : ''; ?>>Baik</option>
-                <option value="Perlu Perawatan" <?= ($kondisi == 'Perlu Perawatan') ? 'selected' : ''; ?>>Perlu Perawatan</option>
-                <option value="Rusak" <?= ($kondisi == 'Rusak') ? 'selected' : ''; ?>>Rusak</option>
+            <input type="text" name="search" placeholder="Cari aset/lokasi..." value="<?= htmlspecialchars($search); ?>">
+            <select name="kategori">
+                <option value="">Semua Kategori</option>
+                <option value="Medis" <?= ($kategori == 'Medis') ? 'selected' : ''; ?>>Medis</option>
+                <option value="Non-Medis" <?= ($kategori == 'Non-Medis') ? 'selected' : ''; ?>>Non-Medis</option>
             </select>
             <input type="date" name="dari" value="<?= $dari; ?>">
             <input type="date" name="sampai" value="<?= $sampai; ?>">
@@ -128,9 +126,9 @@ function formatTanggal($tanggal)
 
     <div class="stats mb-3">
         <div class="stat">Total Item: <strong><?= intval($stat['total_all']); ?></strong></div>
-        <div class="stat text-success">Kondisi Baik: <strong><?= intval($stat['total_baik']); ?></strong></div>
-        <div class="stat text-warning">Perlu Rawat: <strong><?= intval($stat['total_perawatan']); ?></strong></div>
-        <div class="stat text-danger">Rusak: <strong><?= intval($stat['total_rusak']); ?></strong></div>
+        <div class="stat text-success">Total Tersedia: <strong><?= intval($stat['total_tersedia']); ?></strong></div>
+        <div class="stat text-warning">Total Perawatan: <strong><?= intval($stat['total_perawatan']); ?></strong></div>
+        <div class="stat text-danger">Total Rusak: <strong><?= intval($stat['total_rusak']); ?></strong></div>
     </div>
 
     <div class="card">
@@ -146,18 +144,19 @@ function formatTanggal($tanggal)
                             <th>Jenis</th>
                             <th>Tipe</th>
                             <th>Lokasi Ruangan</th>
-                            <th>Kondisi</th>
+                            <th>Total Stok</th>
+                            <th>Rincian Ketersediaan</th>
                             <th>Asal Usul</th>
                             <th>Harga Perolehan</th>
                             <th>Umur Eko.</th>
                             <th>Tanggal Masuk</th>
-                            <th>Foto Fisik</th>
+                            <th>Dokumen / Foto</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (mysqli_num_rows($dataQ) == 0): ?>
                             <tr>
-                                <td colspan="12" class="text-center py-4">Data komponen aset tidak ditemukan atau kosong.</td>
+                                <td colspan="13" class="text-center py-4">Data komponen aset tidak ditemukan atau kosong.</td>
                             </tr>
                         <?php else: ?>
                             <?php $no = $offset + 1;
@@ -177,17 +176,30 @@ function formatTanggal($tanggal)
                                     <td><?= htmlspecialchars($a['jenis']); ?></td>
                                     <td><?= htmlspecialchars($a['tipe_aset']); ?></td>
                                     <td class="text-start"><i class="bi bi-geo-alt text-danger me-1"></i><?= htmlspecialchars($a['lokasi']); ?></td>
-                                    <td>
-                                        <?php
-                                        $bg = 'text-success';
-                                        if ($a['kondisi'] == 'Perlu Perawatan') $bg = 'text-warning';
-                                        if ($a['kondisi'] == 'Rusak') $bg = 'text-danger';
-                                        ?>
-                                        <span class="fw-bold <?= $bg; ?>"><?= $a['kondisi']; ?></span>
+
+                                    <td class="text-center">
+                                        <div class="fw-bold text-primary" style="font-size: 1.1rem;">
+                                            <?= isset($a['total_stok']) ? htmlspecialchars($a['total_stok']) : (isset($a['stok']) ? htmlspecialchars($a['stok']) : '0') ?> Unit
+                                        </div>
                                     </td>
+
+                                    <td>
+                                        <div class="d-flex flex-column gap-1 align-items-start">
+                                            <span class="badge bg-success w-100 text-start" style="font-size: 0.8rem; font-weight: normal;">
+                                                <i class="bi bi-check-circle-fill me-1"></i> Tersedia: <?= isset($a['stok_tersedia']) ? htmlspecialchars($a['stok_tersedia']) : '0' ?>
+                                            </span>
+                                            <span class="badge bg-danger w-100 text-start" style="font-size: 0.8rem; font-weight: normal;">
+                                                <i class="bi bi-x-circle-fill me-1"></i> Rusak: <?= isset($a['stok_rusak']) ? htmlspecialchars($a['stok_rusak']) : '0' ?>
+                                            </span>
+                                            <span class="badge bg-warning text-dark w-100 text-start" style="font-size: 0.8rem; font-weight: normal;">
+                                                <i class="bi bi-exclamation-circle-fill me-1"></i> Perawatan: <?= isset($a['stok_perawatan']) ? htmlspecialchars($a['stok_perawatan']) : '0' ?>
+                                            </span>
+                                        </div>
+                                    </td>
+
                                     <td><?= htmlspecialchars($a['asal_usul']); ?></td>
                                     <td class="text-end fw-bold">Rp <?= number_format($a['harga'], 0, ',', '.') ?></td>
-                                    <td class="text-success fw-bold"><?= ($a['umur_ekonomis'] > 0) ? $a['umur_ekonomis'] . ' Thn' : '-' ?></td>
+                                    <td class="text-success fw-bold"><?= (isset($a['umur_ekonomis']) && $a['umur_ekonomis'] > 0) ? $a['umur_ekonomis'] . ' Thn' : '-' ?></td>
                                     <td><?= formatTanggal($a['tanggal_masuk']); ?></td>
 
                                     <td>
@@ -202,7 +214,6 @@ function formatTanggal($tanggal)
                                             <span class="text-muted" style="font-size: 0.75rem;">Tidak Ada</span>
                                         <?php endif; ?>
                                     </td>
-
                                 </tr>
                             <?php endwhile; ?>
                         <?php endif; ?>

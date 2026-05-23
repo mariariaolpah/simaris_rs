@@ -15,8 +15,17 @@ if (isset($_SESSION['level']) && strtolower(trim($_SESSION['level'])) == 'admin'
 
 include(__DIR__ . '/../config/koneksi.php');
 
-// Ambil data kerusakan
-$kerusakan = mysqli_query($koneksi, "SELECT * FROM kerusakan ORDER BY id DESC");
+// Ambil data kerusakan dengan melakukan JOIN ke tabel aset untuk mendapatkan Lokasi dan Kategori
+$query_kerusakan = "
+    SELECT 
+        kerusakan.*, 
+        aset.kategori_aset, 
+        aset.lokasi 
+    FROM kerusakan 
+    LEFT JOIN aset ON kerusakan.nama_aset = aset.nama_aset 
+    ORDER BY kerusakan.id DESC
+";
+$kerusakan = mysqli_query($koneksi, $query_kerusakan);
 ?>
 
 <!DOCTYPE html>
@@ -24,7 +33,7 @@ $kerusakan = mysqli_query($koneksi, "SELECT * FROM kerusakan ORDER BY id DESC");
 
 <head>
     <meta charset="UTF-8">
-    <title>Laporan Kerusakan | User</title>
+    <title>Laporan Kerusakan | Pegawai</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
 
@@ -39,10 +48,28 @@ $kerusakan = mysqli_query($koneksi, "SELECT * FROM kerusakan ORDER BY id DESC");
             padding: 25px 35px;
         }
 
-        table.table thead tr th {
+        .dashboard-header {
             background: linear-gradient(90deg, #2c7a7b, #1cc88a);
+            color: #fff;
+            padding: 20px 30px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        table.table thead tr th {
+            background: linear-gradient(90deg, #2c7a7b, #1cc88a) !important;
             color: #fff !important;
-            border-color: #1cc88a;
+            border-color: #1cc88a !important;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+
+        table.table tbody tr td {
+            vertical-align: middle;
         }
 
         tr:hover {
@@ -54,28 +81,31 @@ $kerusakan = mysqli_query($koneksi, "SELECT * FROM kerusakan ORDER BY id DESC");
             padding: 6px 12px;
             border-radius: 8px;
             font-weight: bold;
+            display: inline-block;
         }
 
-        .rusak {
-            background-color: #dc3545;
-            color: white;
+        .badge-medis {
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-weight: 600;
         }
 
-        .baik {
-            background-color: #28a745;
-            color: white;
+        .badge-nonmedis {
+            background: #e0f2fe;
+            color: #0284c7;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-weight: 600;
         }
 
-        .rawat,
-        .pending,
-        .proses {
-            background-color: #ffc107;
-            color: black;
-        }
-
-        .selesai {
-            background-color: #198754;
-            color: white;
+        .kolom-keterangan {
+            min-width: 200px;
+            max-width: 250px;
+            white-space: normal !important;
         }
     </style>
 
@@ -87,57 +117,61 @@ $kerusakan = mysqli_query($koneksi, "SELECT * FROM kerusakan ORDER BY id DESC");
 
     <div id="page-content-wrapper">
 
-        <h4 class="fw-bold text-dark">Laporan Kerusakan</h4>
-        <p class="text-muted">Berikut daftar kerusakan aset yang anda laporkan.</p>
+        <div class="dashboard-header">
+            <div>
+                <h4 class="fw-bold m-0"><i class="bi bi-exclamation-octagon"></i> DATA LAPORAN KERUSAKAN</h4>
+                <small class="text-light">Pantau status laporan kerusakan aset rumah sakit yang telah diajukan.</small>
+            </div>
+            <div>
+                <i class="bi bi-person-badge"></i> Pegawai
+            </div>
+        </div>
 
-        <div class="card p-3 shadow-sm mb-3">
+        <div class="card p-3 shadow-sm border-0 mb-3" style="border-radius: 12px;">
             <div class="row g-3 align-items-center">
 
-                <div class="col-md-4">
+                <div class="col-md-5">
                     <input type="text" id="searchInput" class="form-control"
-                        placeholder="Cari laporan..."
-                        style="flex: 2; padding:10px; font-size:14px;">
+                        placeholder="Cari nama aset, lokasi, atau teknisi..."
+                        style="padding:10px; font-size:14px;">
                 </div>
 
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <select id="filterStatus" class="form-select"
-                        style="flex: 1.2; padding:10px; font-size:14px;">
-                        <option value="">Semua Status</option>
+                        style="padding:10px; font-size:14px;">
+                        <option value="">Semua Status Laporan</option>
                         <option value="Rusak">Rusak</option>
-                        <option value="Baik">Baik</option>
-                        <option value="Dalam Perawatan">Dalam Perawatan</option>
+                        <option value="Perlu Perawatan">Perlu Perawatan</option>
                         <option value="Pending">Pending</option>
-                        <option value="Proses">Proses</option>
+                        <option value="Diproses">Diproses / Diperbaiki</option>
                         <option value="Selesai">Selesai</option>
                     </select>
                 </div>
 
                 <div class="col-md-4 d-flex justify-content-end gap-2">
-                    <button class="btn btn-success"
-                        onclick="resetFilter()"
-                        style="flex: 0.5; padding:10px 14px; font-size:14px;">
-                        <i class="bi bi-arrow-clockwise"></i>
+                    <button class="btn btn-success px-4" onclick="resetFilter()">
+                        <i class="bi bi-arrow-clockwise"></i> Reset
                     </button>
 
-                    <a href="cetak_kerusakan_user.php" target="_blank"
-                        class="btn btn-danger"
-                        style="flex: 0.8; padding:10px 14px; font-size:14px;">
-                        <i class="bi bi-file-earmark-pdf"></i> PDF
+                    <a href="cetak_kerusakan_user.php" target="_blank" class="btn btn-danger px-4">
+                        <i class="bi bi-file-earmark-pdf"></i> Cetak PDF
                     </a>
                 </div>
             </div>
         </div>
 
-        <div class="card shadow-sm">
-            <div class="card-body p-0">
-                <table class="table table-bordered mb-0" id="tabelKerusakan">
+        <div class="card shadow-sm border-0" style="border-radius: 12px; overflow: hidden;">
+            <div class="card-body p-0 table-responsive">
+                <table class="table table-bordered mb-0 text-center" id="tabelKerusakan">
                     <thead>
                         <tr>
-                            <th>#</th>
-                            <th>Nama Aset</th>
-                            <th>Tanggal</th>
-                            <th>Status</th>
-                            <th>Keterangan</th>
+                            <th width="5%">#</th>
+                            <th width="25%">Nama Aset</th>
+                            <th width="15%">Lokasi Ruangan</th>
+                            <th width="12%">Kategori</th>
+                            <th width="15%">Teknisi Perbaikan</th>
+                            <th width="13%">Status Laporan</th>
+                            <th width="15%">Rincian Kerusakan</th>
                         </tr>
                     </thead>
 
@@ -146,36 +180,38 @@ $kerusakan = mysqli_query($koneksi, "SELECT * FROM kerusakan ORDER BY id DESC");
                         $no = 1;
                         while ($row = mysqli_fetch_assoc($kerusakan)):
 
-                            switch ($row['status']) {
-                                case "Rusak":
-                                    $badgeClass = "rusak";
-                                    break;
-                                case "Baik":
-                                    $badgeClass = "baik";
-                                    break;
-                                case "Dalam Perawatan":
-                                    $badgeClass = "rawat";
-                                    break;
-                                case "Pending":
-                                    $badgeClass = "pending";
-                                    break;
-                                case "Proses":
-                                    $badgeClass = "proses";
-                                    break;
-                                case "Selesai":
-                                    $badgeClass = "selesai";
-                                    break;
-                                default:
-                                    $badgeClass = "pending";
+                            $status = $row['status'] ?? 'Baru';
+                            $bgStatus = 'bg-secondary text-white';
+
+                            if (stripos($status, 'Rusak') !== false) {
+                                $bgStatus = 'bg-danger text-white';
+                            } elseif (stripos($status, 'Perawatan') !== false || stripos($status, 'Pending') !== false) {
+                                $bgStatus = 'bg-warning text-dark';
+                            } elseif (stripos($status, 'Proses') !== false || stripos($status, 'Perbaikan') !== false) {
+                                $bgStatus = 'bg-info text-dark';
+                            } elseif (stripos($status, 'Selesai') !== false || stripos($status, 'Baik') !== false) {
+                                $bgStatus = 'bg-success text-white';
                             }
                         ?>
 
-                            <tr onclick="showDetail('<?= $row['nama_aset'] ?>', '<?= $row['tanggal'] ?>', '<?= $row['status'] ?>', '<?= $row['keterangan'] ?>')">
+                            <tr onclick="showDetail('<?= htmlspecialchars($row['nama_aset']) ?>', '<?= htmlspecialchars($row['lokasi'] ?? '-') ?>', '<?= htmlspecialchars($row['kategori_aset'] ?? '-') ?>', '<?= htmlspecialchars($row['pelapor'] ?? '-') ?>', '<?= !empty($row['tanggal']) ? date('d-m-Y', strtotime($row['tanggal'])) : '-' ?>', '<?= htmlspecialchars($row['teknisi'] ?? '-') ?>', '<?= htmlspecialchars($status) ?>', '<?= htmlspecialchars(str_replace(["\r", "\n"], ' ', $row['keterangan'])) ?>')">
+
                                 <td><?= $no++; ?></td>
-                                <td><?= htmlspecialchars($row['nama_aset']); ?></td>
-                                <td><?= htmlspecialchars($row['tanggal']); ?></td>
-                                <td><span class="badge-status <?= $badgeClass ?>"><?= htmlspecialchars($row['status']); ?></span></td>
-                                <td><?= htmlspecialchars($row['keterangan']); ?></td>
+                                <td class="text-start fw-bold text-dark"><?= htmlspecialchars($row['nama_aset']); ?></td>
+                                <td class="text-start"><i class="bi bi-geo-alt text-danger"></i> <?= htmlspecialchars($row['lokasi'] ?? '-'); ?></td>
+
+                                <td>
+                                    <?php if (($row['kategori_aset'] ?? '') == 'Medis'): ?>
+                                        <span class="badge-medis">Medis</span>
+                                    <?php else: ?>
+                                        <span class="badge-nonmedis">Non-Medis</span>
+                                    <?php endif; ?>
+                                </td>
+
+                                <td class="fw-medium text-primary"><?= htmlspecialchars($row['teknisi'] ?? 'Belum Ditentukan'); ?></td>
+                                <td><span class="badge-status <?= $bgStatus ?>"><?= htmlspecialchars($status); ?></span></td>
+                                <td class="text-start kolom-keterangan text-muted small"><?= htmlspecialchars($row['keterangan']); ?></td>
+
                             </tr>
 
                         <?php endwhile; ?>
@@ -186,13 +222,13 @@ $kerusakan = mysqli_query($koneksi, "SELECT * FROM kerusakan ORDER BY id DESC");
     </div>
 
     <div class="modal fade" id="detailModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Detail Laporan</h5>
-                    <button class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content" style="border-radius: 12px;">
+                <div class="modal-header" style="background: linear-gradient(90deg, #2c7a7b, #1cc88a); color: white; border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-info-circle"></i> Rincian Detail Laporan Kerusakan</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body" id="modalContent"></div>
+                <div class="modal-body" id="modalContent" style="font-size: 15px; line-height: 1.8;"></div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
                 </div>
@@ -203,12 +239,18 @@ $kerusakan = mysqli_query($koneksi, "SELECT * FROM kerusakan ORDER BY id DESC");
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        function showDetail(aset, tanggal, status, ket) {
+        function showDetail(aset, lokasi, kategori, pelapor, tanggal, teknisi, status, ket) {
             document.getElementById("modalContent").innerHTML =
-                `<b>Nama Aset:</b> ${aset}<br>
-         <b>Tanggal:</b> ${tanggal}<br>
-         <b>Status:</b> ${status}<br>
-         <b>Keterangan:</b> ${ket}`;
+                `<table class="table table-sm table-borderless mb-0">
+                    <tr><td width="30%"><b>Nama Aset</b></td><td width="5%">:</td><td class="fw-bold text-dark">${aset}</td></tr>
+                    <tr><td><b>Lokasi Ruangan</b></td><td>:</td><td>${lokasi}</td></tr>
+                    <tr><td><b>Kategori</b></td><td>:</td><td>${kategori}</td></tr>
+                    <tr><td><b>Dilaporkan Oleh</b></td><td>:</td><td>${pelapor} (Pegawai)</td></tr>
+                    <tr><td><b>Tanggal Lapor</b></td><td>:</td><td>${tanggal}</td></tr>
+                    <tr><td><b>Teknisi Perbaikan</b></td><td>:</td><td class="text-primary fw-bold">${teknisi}</td></tr>
+                    <tr><td><b>Status Terkini</b></td><td>:</td><td><b>${status}</b></td></tr>
+                    <tr><td colspan="3" class="pt-3"><b>Keterangan/Rincian Kerusakan:</b><br><div class="bg-light p-2 mt-1 rounded border">${ket}</div></td></tr>
+                 </table>`;
 
             new bootstrap.Modal(document.getElementById("detailModal")).show();
         }
@@ -220,15 +262,21 @@ $kerusakan = mysqli_query($koneksi, "SELECT * FROM kerusakan ORDER BY id DESC");
 
         function applyFilter() {
             let search = searchInput.value.toLowerCase();
-            let status = filterStatus.value;
+            let status = filterStatus.value.toLowerCase();
 
             for (let i = 1; i < trs.length; i++) {
                 let tdNama = trs[i].children[1].textContent.toLowerCase();
-                let tdStatus = trs[i].children[3].textContent;
+                let tdLokasi = trs[i].children[2].textContent.toLowerCase();
+                let tdTeknisi = trs[i].children[4].textContent.toLowerCase();
+                let tdStatus = trs[i].children[5].textContent.toLowerCase(); // Indeks disesuaikan karena 2 kolom dihapus
 
-                trs[i].style.display =
-                    (tdNama.includes(search) && (status === "" || tdStatus === status)) ?
-                    "" : "none";
+                let matchesSearch = tdNama.includes(search) ||
+                    tdLokasi.includes(search) ||
+                    tdTeknisi.includes(search);
+
+                let matchesStatus = (status === "" || tdStatus.includes(status));
+
+                trs[i].style.display = (matchesSearch && matchesStatus) ? "" : "none";
             }
         }
 

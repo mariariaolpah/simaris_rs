@@ -68,7 +68,6 @@ function formatTanggal($tanggal)
     $sampai = isset($_GET['sampai']) ? mysqli_real_escape_string($koneksi, $_GET['sampai']) : '';
 
     $where = [];
-    // Pencarian diperbarui agar bisa mencari berdasarkan nama teknisi
     if ($search !== '') $where[] = "(kerusakan.nama_aset LIKE '%$search%' OR kerusakan.keterangan LIKE '%$search%' OR kerusakan.pelapor LIKE '%$search%' OR kerusakan.teknisi LIKE '%$search%' OR aset.lokasi LIKE '%$search%')";
     if ($statusFilter !== '') $where[] = "kerusakan.status = '$statusFilter'";
     if ($kategoriFilter !== '') $where[] = "aset.kategori_aset = '$kategoriFilter'";
@@ -95,8 +94,9 @@ function formatTanggal($tanggal)
     $totalRow = mysqli_fetch_assoc($countQ)['total'];
     $offset = ($page - 1) * $perPage;
 
+    // Perbaikan: Tambahkan aset.stok_tersedia dan aset.stok_rusak ke dalam query
     $dataQ = mysqli_query($koneksi, "
-        SELECT kerusakan.*, aset.lokasi, aset.kategori_aset 
+        SELECT kerusakan.*, aset.lokasi, aset.kategori_aset, aset.stok_tersedia, aset.stok_rusak 
         FROM kerusakan 
         LEFT JOIN aset ON kerusakan.nama_aset = aset.nama_aset COLLATE utf8mb4_general_ci
         $whereSQL 
@@ -149,7 +149,7 @@ function formatTanggal($tanggal)
                     <thead>
                         <tr>
                             <th style="width:50px;">No</th>
-                            <th class="text-start">Nama Aset</th>
+                            <th class="text-start">Nama Aset & Info Stok</th>
                             <th>Kategori</th>
                             <th>Lokasi Ruangan</th>
                             <th>Pelapor</th>
@@ -169,7 +169,19 @@ function formatTanggal($tanggal)
                             while ($r = mysqli_fetch_assoc($dataQ)): ?>
                                 <tr>
                                     <td><?= $no++; ?></td>
-                                    <td class="text-start fw-bold"><?= htmlspecialchars($r['nama_aset']); ?></td>
+                                    <td class="text-start">
+                                        <span class="fw-bold d-block mb-1 text-dark">
+                                            <?= htmlspecialchars($r['nama_aset']) ?>
+                                        </span>
+                                        <div class="d-flex gap-1" style="font-size: 0.75rem;">
+                                            <span class="badge bg-danger rounded-pill fw-normal" title="Total stok yang tercatat rusak">
+                                                Rusak: <?= isset($r['stok_rusak']) ? htmlspecialchars($r['stok_rusak']) : '0' ?>
+                                            </span>
+                                            <span class="badge bg-success rounded-pill fw-normal" title="Sisa stok yang masih bisa dipakai/dipinjam">
+                                                Tersedia: <?= isset($r['stok_tersedia']) ? htmlspecialchars($r['stok_tersedia']) : '0' ?>
+                                            </span>
+                                        </div>
+                                    </td>
                                     <td>
                                         <?php if (($r['kategori_aset'] ?? '') == 'Medis'): ?>
                                             <span class="badge bg-danger">Medis</span>

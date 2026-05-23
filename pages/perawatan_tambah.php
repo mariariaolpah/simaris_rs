@@ -7,24 +7,23 @@ if (!isset($_SESSION['id_pengguna'])) {
 
 include(__DIR__ . '/../config/koneksi.php');
 
-// Ambil seluruh daftar aset dari master data inventaris
 $aset_query = mysqli_query($koneksi, "SELECT * FROM aset ORDER BY nama_aset ASC");
 
 if (isset($_POST['simpan'])) {
-    // Kita langsung ambil nama_aset dari pilihan dropdown
     $nama_aset     = mysqli_real_escape_string($koneksi, $_POST['nama_aset']);
     $teknisi       = mysqli_real_escape_string($koneksi, $_POST['teknisi']);
     $tanggal       = mysqli_real_escape_string($koneksi, $_POST['tanggal']);
-    $tgl_kalibrasi = mysqli_real_escape_string($koneksi, $_POST['tanggal_kalibrasi_berikutnya']);
     $status        = mysqli_real_escape_string($koneksi, $_POST['status']);
 
-    // Simpan ke tabel perawatan
-    $insert = mysqli_query($koneksi, "INSERT INTO perawatan 
-        (nama_aset, teknisi, tanggal, tanggal_kalibrasi_berikutnya, status) 
-        VALUES 
-        ('$nama_aset','$teknisi','$tanggal','$tgl_kalibrasi','$status')");
+    // [PERBAIKAN ERROR TANGGAL]
+    $tgl_k_input   = $_POST['tanggal_kalibrasi_berikutnya'];
+    $tgl_kalibrasi = !empty($tgl_k_input) ? "'" . mysqli_real_escape_string($koneksi, $tgl_k_input) . "'" : "NULL";
 
-    // Jika perawatan langsung "Selesai", otomatis update kondisi aset menjadi "Baik"
+    $insert = mysqli_query($koneksi, "INSERT INTO perawatan 
+        (nama_aset, teknisi, petugas_kalibrasi, tanggal, tanggal_kalibrasi_berikutnya, status) 
+        VALUES 
+        ('$nama_aset','$teknisi','$teknisi','$tanggal', $tgl_kalibrasi, '$status')");
+
     if ($status == "Selesai") {
         mysqli_query($koneksi, "UPDATE aset SET kondisi = 'Baik' WHERE nama_aset = '$nama_aset'");
     } else {
@@ -32,7 +31,7 @@ if (isset($_POST['simpan'])) {
     }
 
     if ($insert) {
-        echo "<script>alert('Data perawatan berhasil dijadwalkan!');window.location='perawatan.php';</script>";
+        echo "<script>alert('Data perawatan & kalibrasi berhasil dijadwalkan!');window.location='perawatan.php';</script>";
     } else {
         echo "<script>alert('Gagal menyimpan data perawatan!');</script>";
     }
@@ -99,12 +98,6 @@ if (isset($_POST['simpan'])) {
             border: 1px solid #cbd5e1;
         }
 
-        .form-control:focus,
-        .form-select:focus {
-            border-color: #2c7a7b;
-            box-shadow: 0 0 0 0.2rem rgba(44, 122, 123, 0.25);
-        }
-
         .btn-success {
             background: linear-gradient(90deg, #2c7a7b, #1cc88a);
             border: none;
@@ -120,8 +113,16 @@ if (isset($_POST['simpan'])) {
 
 <body>
     <div id="wrapper">
+        <?php
+        $nama_user_aktif = strtolower($_SESSION['nama_pengguna'] ?? '');
+        $is_teknisi = (strpos($nama_user_aktif, 'budi') !== false || strpos($nama_user_aktif, 'ahmad') !== false);
 
-        <?php include(__DIR__ . '/../sidebar.php'); ?>
+        if ($is_teknisi) {
+            include(__DIR__ . '/sidebar_teknisi.php');
+        } else {
+            include(__DIR__ . '/../sidebar.php');
+        }
+        ?>
 
         <div id="page-content-wrapper">
             <div class="container-form">
@@ -142,12 +143,11 @@ if (isset($_POST['simpan'])) {
                                         </option>
                                     <?php endwhile; ?>
                                 </select>
-                                <small class="text-muted">Pilih langsung dari master data inventaris Anda.</small>
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold">Nama Teknisi / Vendor</label>
-                                <input type="text" name="teknisi" class="form-control" placeholder="Contoh: PT. Medika / Mail" required>
+                                <label class="form-label fw-bold">Nama Teknisi / Petugas Kalibrasi</label>
+                                <input type="text" name="teknisi" class="form-control bg-light text-primary fw-bold" value="Ahmad Fauzi" readonly required>
                             </div>
 
                             <div class="row">
@@ -157,7 +157,7 @@ if (isset($_POST['simpan'])) {
                                 </div>
 
                                 <div class="col-md-6 mb-4">
-                                    <label class="form-label fw-bold text-danger">Jadwal Kalibrasi Berikutnya</label>
+                                    <label class="form-label fw-bold text-danger">Jadwal Kalibrasi Berikutnya (Opsional)</label>
                                     <input type="date" name="tanggal_kalibrasi_berikutnya" class="form-control border-danger">
                                 </div>
                             </div>
@@ -185,7 +185,6 @@ if (isset($_POST['simpan'])) {
                                     </a>
                                 </div>
                             </div>
-
                         </form>
                     </div>
                 </div>

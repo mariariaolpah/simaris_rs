@@ -26,8 +26,9 @@ if ($sampai != '')  $where[] = "kerusakan.tanggal <= '$sampai'";
 $whereSQL = count($where) ? 'WHERE ' . implode(' AND ', $where) : '';
 
 // ==================== QUERY DATA ==================== //
+// Perbaikan: Tambahkan aset.stok_tersedia, aset.stok_rusak ke dalam query
 $sql = "
-    SELECT kerusakan.*, aset.lokasi, aset.kategori_aset 
+    SELECT kerusakan.*, aset.lokasi, aset.kategori_aset, aset.stok_tersedia, aset.stok_rusak 
     FROM kerusakan 
     LEFT JOIN aset ON kerusakan.nama_aset = aset.nama_aset COLLATE utf8mb4_general_ci
     $whereSQL 
@@ -73,14 +74,20 @@ if (count($subHeader) > 0) {
 }
 $pdf->Ln(4);
 
+// Keterangan Singkatan Stok
+$pdf->SetFont('Arial', 'I', 8);
+$pdf->SetTextColor(80, 80, 80);
+$pdf->Cell(0, 5, '*Keterangan Info Stok: ( T = Tersedia | R = Rusak )', 0, 1, 'L');
+$pdf->Ln(2);
+
 // ==================== HEADER TABEL ==================== //
-// Total Lebar: 10+40+30+20+35+25+22+25+70 = 277 mm
-$w = [10, 40, 30, 20, 35, 25, 22, 25, 70];
-$header = ['No', 'Nama Aset', 'Lokasi Ruang', 'Kategori', 'Pelapor', 'Teknisi', 'Tanggal', 'Status', 'Rincian'];
+// Total Lebar: 8+33+18+23+16+25+23+20+25+86 = 277 mm
+$w = [8, 33, 18, 23, 16, 25, 23, 20, 25, 86];
+$header = ['No', 'Nama Aset', 'Info Stok', 'Lokasi', 'Kategori', 'Pelapor', 'Teknisi', 'Tanggal', 'Status', 'Rincian'];
 
 function cetakHeaderLaporanKerusakan($pdf, $w, $header)
 {
-    $pdf->SetFont('Arial', 'B', 9);
+    $pdf->SetFont('Arial', 'B', 8);
     $pdf->SetFillColor(72, 201, 176);
     $pdf->SetTextColor(255);
     for ($i = 0; $i < count($header); $i++) {
@@ -103,7 +110,11 @@ while ($r = mysqli_fetch_assoc($res)) {
     $tanggal    = date('d-m-Y', strtotime($r['tanggal']));
     $status     = $r['status'] ?? '-';
     $keterangan = $r['keterangan'] ?? '-';
-    $teknisi    = $r['teknisi'] ?? '-'; // Data Teknisi
+    $teknisi    = $r['teknisi'] ?? '-';
+
+    $stok_tersedia = isset($r['stok_tersedia']) ? $r['stok_tersedia'] : '0';
+    $stok_rusak    = isset($r['stok_rusak']) ? $r['stok_rusak'] : '0';
+    $info_stok     = "T: " . $stok_tersedia . " | R: " . $stok_rusak;
 
     $pelapor_asli  = $r['pelapor'] ?? '-';
     $sumber_label  = (isset($r['sumber']) && $r['sumber'] == 'App User') ? 'App User' : 'Admin';
@@ -112,9 +123,9 @@ while ($r = mysqli_fetch_assoc($res)) {
     // Hitung baris tertinggi untuk sel MultiCell
     $maxLine = max(
         2,
-        ceil(strlen($nama_aset) / 20),
-        ceil(strlen($lokasi) / 15),
-        ceil(strlen($keterangan) / 45)
+        ceil(strlen($nama_aset) / 18),
+        ceil(strlen($lokasi) / 12),
+        ceil(strlen($keterangan) / 55)
     );
     $tinggi = ($maxLine * 5) + 4;
 
@@ -126,7 +137,7 @@ while ($r = mysqli_fetch_assoc($res)) {
     $x = $pdf->GetX();
     $y = $pdf->GetY();
 
-    // Gambar bingkai kotak untuk 9 kolom
+    // Gambar bingkai kotak untuk 10 kolom
     $currentX = $x;
     for ($i = 0; $i < count($w); $i++) {
         $pdf->Rect($currentX, $y, $w[$i], $tinggi);
@@ -140,26 +151,29 @@ while ($r = mysqli_fetch_assoc($res)) {
     $pdf->SetXY($x + $w[0] + 1, $y + 2);
     $pdf->MultiCell($w[1] - 2, 5, $nama_aset, 0, 'L');
 
-    $pdf->SetXY($x + $w[0] + $w[1] + 1, $y + 2);
-    $pdf->MultiCell($w[2] - 2, 5, $lokasi, 0, 'L');
+    $pdf->SetXY($x + $w[0] + $w[1], $y + 2);
+    $pdf->Cell($w[2], 5, $info_stok, 0, 0, 'C');
 
-    $pdf->SetXY($x + $w[0] + $w[1] + $w[2], $y + 2);
-    $pdf->Cell($w[3], 5, $kategori, 0, 0, 'C');
+    $pdf->SetXY($x + $w[0] + $w[1] + $w[2] + 1, $y + 2);
+    $pdf->MultiCell($w[3] - 2, 5, $lokasi, 0, 'L');
 
-    $pdf->SetXY($x + $w[0] + $w[1] + $w[2] + $w[3] + 1, $y + 2);
-    $pdf->MultiCell($w[4] - 2, 5, $pelapor_cetak, 0, 'L');
+    $pdf->SetXY($x + $w[0] + $w[1] + $w[2] + $w[3], $y + 2);
+    $pdf->Cell($w[4], 5, $kategori, 0, 0, 'C');
 
     $pdf->SetXY($x + $w[0] + $w[1] + $w[2] + $w[3] + $w[4] + 1, $y + 2);
-    $pdf->MultiCell($w[5] - 2, 5, $teknisi, 0, 'L');
+    $pdf->MultiCell($w[5] - 2, 5, $pelapor_cetak, 0, 'L');
 
-    $pdf->SetXY($x + $w[0] + $w[1] + $w[2] + $w[3] + $w[4] + $w[5], $y + 2);
-    $pdf->Cell($w[6], 5, $tanggal, 0, 0, 'C');
+    $pdf->SetXY($x + $w[0] + $w[1] + $w[2] + $w[3] + $w[4] + $w[5] + 1, $y + 2);
+    $pdf->MultiCell($w[6] - 2, 5, $teknisi, 0, 'L');
 
     $pdf->SetXY($x + $w[0] + $w[1] + $w[2] + $w[3] + $w[4] + $w[5] + $w[6], $y + 2);
-    $pdf->Cell($w[7], 5, $status, 0, 0, 'C');
+    $pdf->Cell($w[7], 5, $tanggal, 0, 0, 'C');
 
-    $pdf->SetXY($x + $w[0] + $w[1] + $w[2] + $w[3] + $w[4] + $w[5] + $w[6] + $w[7] + 1, $y + 2);
-    $pdf->MultiCell($w[8] - 2, 5, $keterangan, 0, 'L');
+    $pdf->SetXY($x + $w[0] + $w[1] + $w[2] + $w[3] + $w[4] + $w[5] + $w[6] + $w[7], $y + 2);
+    $pdf->Cell($w[8], 5, $status, 0, 0, 'C');
+
+    $pdf->SetXY($x + $w[0] + $w[1] + $w[2] + $w[3] + $w[4] + $w[5] + $w[6] + $w[7] + $w[8] + 1, $y + 2);
+    $pdf->MultiCell($w[9] - 2, 5, $keterangan, 0, 'L');
 
     $pdf->SetY($y + $tinggi);
 }

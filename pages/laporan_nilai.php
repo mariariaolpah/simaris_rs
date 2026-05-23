@@ -62,9 +62,10 @@ include(__DIR__ . '/../header.php');
     $whereSQL = 'WHERE ' . implode(' AND ', $where);
 
     // =========================================================
-    // MENGHITUNG STATISTIK TOTAL DENGAN RUMUS DEPRESIASI (DIKALIKAN STOK)
+    // MENGHITUNG STATISTIK TOTAL DENGAN RUMUS DEPRESIASI (DIKALIKAN TOTAL STOK)
     // =========================================================
-    $statSumQ = mysqli_query($koneksi, "SELECT harga, stok, tanggal_masuk, umur_ekonomis FROM aset $whereSQL");
+    // PERBAIKAN: Mengubah 'stok' menjadi 'total_stok'
+    $statSumQ = mysqli_query($koneksi, "SELECT harga, total_stok, tanggal_masuk, umur_ekonomis FROM aset $whereSQL");
     $total_jenis_aset = 0;
     $total_unit_aset = 0;
     $total_harga_awal = 0;
@@ -74,7 +75,8 @@ include(__DIR__ . '/../header.php');
 
     while ($rowStat = mysqli_fetch_assoc($statSumQ)) {
         $total_jenis_aset++;
-        $stok = (int)($rowStat['stok'] ?? 1);
+        // PERBAIKAN: Mengubah 'stok' menjadi 'total_stok'
+        $stok = (int)($rowStat['total_stok'] ?? 0);
         $total_unit_aset += $stok;
 
         $harga_awal = $rowStat['harga'] * $stok; // Harga total berdasarkan stok
@@ -162,7 +164,8 @@ include(__DIR__ . '/../header.php');
                     }
 
                     while ($r = mysqli_fetch_assoc($dataQ)) {
-                        $stok = (int)($r['stok'] ?? 1);
+                        // PERBAIKAN: Mengubah 'stok' menjadi 'total_stok'
+                        $stok = (int)($r['total_stok'] ?? 0);
                         $harga_total = $r['harga'] * $stok;
 
                         $umur = isset($r['umur_ekonomis']) ? (int)$r['umur_ekonomis'] : 0;

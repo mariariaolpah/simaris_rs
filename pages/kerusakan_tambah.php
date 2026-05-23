@@ -21,34 +21,27 @@ if (isset($_POST['simpan'])) {
     $keterangan  = mysqli_real_escape_string($koneksi, $_POST['keterangan']);
     $pelapor     = mysqli_real_escape_string($koneksi, $_POST['pelapor']);
 
-    // Logika pengisian teknisi: Jika admin, ambil dari form. Jika user, otomatis '-'
-    $teknisi = '-';
-    if ($is_admin && isset($_POST['teknisi']) && trim($_POST['teknisi']) !== '') {
-        $teknisi = mysqli_real_escape_string($koneksi, $_POST['teknisi']);
-    }
+    // [MODIFIKASI] Teknisi otomatis dikunci ke Budi Setiawan
+    $teknisi = 'Budi Setiawan';
 
     // Ambil nama_aset berdasarkan id_aset pilihan user
     $aset_find  = mysqli_query($koneksi, "SELECT nama_aset FROM aset WHERE id_aset=$id_aset LIMIT 1");
     $aset_row   = mysqli_fetch_assoc($aset_find);
     $nama_aset  = $aset_row['nama_aset'];
 
-    // Simpan data ke tabel kerusakan (Termasuk kolom teknisi)
+    // Simpan data ke tabel kerusakan
     $insert = mysqli_query($koneksi, "INSERT INTO kerusakan (nama_aset, status, tanggal, keterangan, pelapor, teknisi) 
                             VALUES ('$nama_aset','$status','$tanggal','$keterangan', '$pelapor', '$teknisi')");
 
-    // [MODIFIKASI] Mengupdate rincian stok ketersediaan di master data secara otomatis
+    // Mengupdate rincian stok ketersediaan di master data secara otomatis
     if ($insert) {
         if ($status == "Rusak") {
-            // Kurangi stok tersedia, dan tambah 1 ke stok rusak
             mysqli_query($koneksi, "UPDATE aset SET stok_tersedia = stok_tersedia - 1, stok_rusak = stok_rusak + 1 WHERE id_aset = $id_aset");
         } elseif ($status == "Perlu Perawatan" || $status == "Dalam Perbaikan") {
-            // Kurangi stok tersedia, dan tambah 1 ke stok perawatan
             mysqli_query($koneksi, "UPDATE aset SET stok_tersedia = stok_tersedia - 1, stok_perawatan = stok_perawatan + 1 WHERE id_aset = $id_aset");
         }
 
-        // Jika statusnya langsung "Selesai Diperbaiki" (walau jarang di awal), stok dibiarkan utuh
-
-        echo "<script>alert('Laporan kerusakan aset berhasil dicatat & rincian stok diperbarui!');window.location='kerusakan.php';</script>";
+        echo "<script>alert('Laporan kerusakan aset berhasil dicatat & masuk ke antrean Budi Setiawan!');window.location='kerusakan.php';</script>";
     } else {
         echo "<script>alert('Gagal menyimpan laporan kerusakan!');</script>";
     }
@@ -147,7 +140,13 @@ if (isset($_POST['simpan'])) {
 
 <body>
     <div id="wrapper">
-        <?php include(__DIR__ . '/../sidebar.php'); ?>
+        <?php
+        if (isset($_SESSION['level']) && $_SESSION['level'] == 'teknisi') {
+            include(__DIR__ . '/sidebar_teknisi.php');
+        } else {
+            include(__DIR__ . '/../sidebar.php');
+        }
+        ?>
 
         <div id="page-content-wrapper">
             <div class="dashboard-header">
@@ -180,38 +179,18 @@ if (isset($_POST['simpan'])) {
                                 </select>
                             </div>
 
-                            <div class="mb-4">
-                                <label class="form-label">Nama Pelapor</label>
-                                <input type="text"
-                                    name="pelapor"
-                                    class="form-control <?= !$is_admin ? 'bg-light' : '' ?>"
-                                    value="<?= htmlspecialchars($_SESSION['nama_pengguna']); ?>"
-                                    <?= !$is_admin ? 'readonly' : '' ?>
-                                    required>
-
-                                <?php if ($is_admin): ?>
-                                    <div class="form-text text-primary"><i class="bi bi-info-circle"></i> Anda login sebagai Admin. Anda bisa mengubah nama ini jika melaporkan atas nama orang lain.</div>
-                                <?php else: ?>
-                                    <div class="form-text text-muted"><i class="bi bi-lock-fill"></i> Nama pelapor otomatis dikunci sesuai akun Anda.</div>
-                                <?php endif; ?>
-                            </div>
-
-                            <?php if ($is_admin): ?>
-                                <div class="mb-4">
-                                    <label class="form-label">Langsung Tugaskan Teknisi (Opsional)</label>
-                                    <select name="teknisi" class="form-select border-primary">
-                                        <option value="">-- Pilih Teknisi (Abaikan jika belum ada) --</option>
-                                        <?php
-                                        // Mengambil nama pengguna yang level/role-nya teknisi
-                                        $query_teknisi = mysqli_query($koneksi, "SELECT nama_pengguna FROM pengguna WHERE level = 'teknisi' AND status = 'aktif'");
-                                        while ($t = mysqli_fetch_assoc($query_teknisi)) {
-                                            echo "<option value='" . htmlspecialchars($t['nama_pengguna']) . "'>" . htmlspecialchars($t['nama_pengguna']) . "</option>";
-                                        }
-                                        ?>
-                                    </select>
-                                    <div class="form-text text-success"><i class="bi bi-check-circle"></i> Fitur khusus Admin: Nama teknisi otomatis diambil dari Data Pengguna.</div>
+                            <div class="row">
+                                <div class="col-md-6 mb-4">
+                                    <label class="form-label">Nama Pelapor</label>
+                                    <input type="text" name="pelapor" class="form-control <?= !$is_admin ? 'bg-light' : '' ?>" value="<?= htmlspecialchars($_SESSION['nama_pengguna']); ?>" <?= !$is_admin ? 'readonly' : '' ?> required>
+                                    <div class="form-text text-muted">Diisi oleh akun Anda.</div>
                                 </div>
-                            <?php endif; ?>
+                                <div class="col-md-6 mb-4">
+                                    <label class="form-label">Teknisi Perbaikan (Otomatis)</label>
+                                    <input type="text" name="teknisi" class="form-control bg-light text-primary fw-bold" value="Budi Setiawan" readonly required>
+                                    <div class="form-text text-success"><i class="bi bi-check-circle"></i> Otomatis ke antrean teknisi Budi.</div>
+                                </div>
+                            </div>
 
                             <div class="highlight-danger">
                                 <h6 class="fw-bold text-danger mb-1"><i class="bi bi-shield-fill-exclamation"></i> Peringatan Respon Cepat RS</h6>

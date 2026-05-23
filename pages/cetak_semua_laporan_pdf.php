@@ -45,21 +45,21 @@ $pdf->Ln(6);
 
 
 // =========================================================================
-// SECTION 1: LAPORAN ASET
+// SECTION 1: LAPORAN ASET 
 // =========================================================================
-$w_aset = [8, 37, 20, 24, 24, 30, 18, 26, 30, 15, 22, 23];
-$header_aset = ['No', 'Nama Aset', 'Kategori', 'Jenis', 'Tipe', 'Lokasi', 'Kondisi', 'Asal Usul', 'Harga (Rp)', 'Umur', 'Tgl Masuk', 'Foto'];
+$w_aset = [8, 40, 15, 18, 18, 20, 16, 28, 18, 25, 14, 20, 37];
+$header_aset = ['No', 'Nama Aset', 'Kategori', 'Jenis', 'Tipe', 'Lokasi Ruangan', 'Total Stok', 'Rincian Ketersediaan', 'Asal Usul', 'Harga Perolehan', 'Umur Eko.', 'Tanggal Masuk', 'Dokumen'];
 
 function cetakHeaderTabelAsetLengkap($pdf, $w, $header)
 {
-    $pdf->SetFont('Arial', 'B', 8);
+    $pdf->SetFont('Arial', 'B', 5.5);
     $pdf->SetFillColor(72, 201, 176);
     $pdf->SetTextColor(255);
     for ($i = 0; $i < count($header); $i++) {
         $pdf->Cell($w[$i], 9, $header[$i], 1, 0, 'C', true);
     }
     $pdf->Ln();
-    $pdf->SetFont('Arial', '', 7);
+    $pdf->SetFont('Arial', '', 6);
     $pdf->SetTextColor(0);
 }
 
@@ -78,18 +78,28 @@ if (mysqli_num_rows($res_aset) == 0) {
 } else {
     $no_aset = 1;
     while ($r = mysqli_fetch_assoc($res_aset)) {
-        $nama_aset = $r['nama_aset'] ?? '-';
-        $kategori  = $r['kategori_aset'] ?? '-';
-        $jenis     = $r['jenis'] ?? '-';
-        $tipe      = $r['tipe_aset'] ?? '-';
-        $lokasi    = $r['lokasi'] ?? '-';
-        $kondisi   = $r['kondisi'] ?? '-';
-        $asal      = $r['asal_usul'] ?? '-';
-        $harga     = number_format($r['harga'], 0, ',', '.');
-        $umur      = ($r['umur_ekonomis'] > 0) ? $r['umur_ekonomis'] . ' Th' : '-';
-        $tgl       = date('d/m/Y', strtotime($r['tanggal_masuk']));
+        $nama_aset  = $r['nama_aset'] ?? '-';
+        $kategori   = $r['kategori_aset'] ?? '-';
+        $jenis      = $r['jenis'] ?? '-';
+        $tipe       = $r['tipe_aset'] ?? '-';
+        $lokasi     = $r['lokasi'] ?? '-';
+        $stok       = isset($r['total_stok']) ? $r['total_stok'] : (isset($r['stok']) ? $r['stok'] : '0');
+        $rincian    = "Tersedia: " . ($r['stok_tersedia'] ?? '0') . "\nRusak: " . ($r['stok_rusak'] ?? '0') . "\nRawat: " . ($r['stok_perawatan'] ?? '0');
+        $asal       = $r['asal_usul'] ?? '-';
+        $harga      = 'Rp ' . number_format($r['harga'], 0, ',', '.');
+        $umur       = (isset($r['umur_ekonomis']) && $r['umur_ekonomis'] > 0) ? $r['umur_ekonomis'] . ' Th' : '-';
 
-        $maxLine = max(2, ceil(strlen($nama_aset) / 25), ceil(strlen($jenis) / 15), ceil(strlen($tipe) / 15), ceil(strlen($lokasi) / 20), ceil(strlen($asal) / 18));
+        $tgl_masuk  = $r['tanggal_masuk'] ?? '';
+        $tgl        = (!$tgl_masuk || $tgl_masuk == '0000-00-00') ? '-' : date('d-m-Y', strtotime($tgl_masuk));
+
+        $maxLine = max(
+            3,
+            ceil(strlen($nama_aset) / 30),
+            ceil(strlen($jenis) / 15),
+            ceil(strlen($tipe) / 15),
+            ceil(strlen($lokasi) / 15),
+            ceil(strlen($asal) / 15)
+        );
         $tinggi = ($maxLine * 4) + 4;
 
         if ($pdf->GetY() + $tinggi > 185) {
@@ -100,44 +110,57 @@ if (mysqli_num_rows($res_aset) == 0) {
         $x = $pdf->GetX();
         $y = $pdf->GetY();
         $sum_w = 0;
-        for ($i = 0; $i < 12; $i++) {
+        for ($i = 0; $i < 13; $i++) {
             $pdf->Rect($x + $sum_w, $y, $w_aset[$i], $tinggi);
             $sum_w += $w_aset[$i];
         }
 
         $pdf->SetXY($x, $y + 2);
         $pdf->Cell($w_aset[0], 4, $no_aset++, 0, 0, 'C');
+
         $pdf->SetXY($x + $w_aset[0] + 1, $y + 2);
         $pdf->MultiCell($w_aset[1] - 2, 4, $nama_aset, 0, 'L');
+
         $pdf->SetXY($x + $w_aset[0] + $w_aset[1], $y + 2);
         $pdf->Cell($w_aset[2], 4, $kategori, 0, 0, 'C');
+
         $pdf->SetXY($x + $w_aset[0] + $w_aset[1] + $w_aset[2] + 1, $y + 2);
         $pdf->MultiCell($w_aset[3] - 2, 4, $jenis, 0, 'L');
+
         $pdf->SetXY($x + $w_aset[0] + $w_aset[1] + $w_aset[2] + $w_aset[3] + 1, $y + 2);
         $pdf->MultiCell($w_aset[4] - 2, 4, $tipe, 0, 'L');
+
         $pdf->SetXY($x + $w_aset[0] + $w_aset[1] + $w_aset[2] + $w_aset[3] + $w_aset[4] + 1, $y + 2);
         $pdf->MultiCell($w_aset[5] - 2, 4, $lokasi, 0, 'L');
+
         $pdf->SetXY($x + $w_aset[0] + $w_aset[1] + $w_aset[2] + $w_aset[3] + $w_aset[4] + $w_aset[5], $y + 2);
-        $pdf->Cell($w_aset[6], 4, $kondisi, 0, 0, 'C');
+        $pdf->Cell($w_aset[6], 4, $stok, 0, 0, 'C');
+
         $pdf->SetXY($x + $w_aset[0] + $w_aset[1] + $w_aset[2] + $w_aset[3] + $w_aset[4] + $w_aset[5] + $w_aset[6] + 1, $y + 2);
-        $pdf->MultiCell($w_aset[7] - 2, 4, $asal, 0, 'L');
+        $pdf->MultiCell($w_aset[7] - 2, 4, $rincian, 0, 'L');
+
         $pdf->SetXY($x + $w_aset[0] + $w_aset[1] + $w_aset[2] + $w_aset[3] + $w_aset[4] + $w_aset[5] + $w_aset[6] + $w_aset[7] + 1, $y + 2);
-        $pdf->MultiCell($w_aset[8] - 2, 4, $harga, 0, 'R');
-        $pdf->SetXY($x + $w_aset[0] + $w_aset[1] + $w_aset[2] + $w_aset[3] + $w_aset[4] + $w_aset[5] + $w_aset[6] + $w_aset[7] + $w_aset[8], $y + 2);
-        $pdf->Cell($w_aset[9], 4, $umur, 0, 0, 'C');
+        $pdf->MultiCell($w_aset[8] - 2, 4, $asal, 0, 'L');
+
+        $pdf->SetXY($x + $w_aset[0] + $w_aset[1] + $w_aset[2] + $w_aset[3] + $w_aset[4] + $w_aset[5] + $w_aset[6] + $w_aset[7] + $w_aset[8] + 1, $y + 2);
+        $pdf->MultiCell($w_aset[9] - 2, 4, $harga, 0, 'R');
+
         $pdf->SetXY($x + $w_aset[0] + $w_aset[1] + $w_aset[2] + $w_aset[3] + $w_aset[4] + $w_aset[5] + $w_aset[6] + $w_aset[7] + $w_aset[8] + $w_aset[9], $y + 2);
-        $pdf->Cell($w_aset[10], 4, $tgl, 0, 0, 'C');
+        $pdf->Cell($w_aset[10], 4, $umur, 0, 0, 'C');
+
+        $pdf->SetXY($x + $w_aset[0] + $w_aset[1] + $w_aset[2] + $w_aset[3] + $w_aset[4] + $w_aset[5] + $w_aset[6] + $w_aset[7] + $w_aset[8] + $w_aset[9] + $w_aset[10], $y + 2);
+        $pdf->Cell($w_aset[11], 4, $tgl, 0, 0, 'C');
 
         $imgPath = __DIR__ . '/../assets/dokumen/' . $r['dokumen'];
-        $imgColStart = $x + $w_aset[0] + $w_aset[1] + $w_aset[2] + $w_aset[3] + $w_aset[4] + $w_aset[5] + $w_aset[6] + $w_aset[7] + $w_aset[8] + $w_aset[9] + $w_aset[10];
+        $imgColStart = $x + $w_aset[0] + $w_aset[1] + $w_aset[2] + $w_aset[3] + $w_aset[4] + $w_aset[5] + $w_aset[6] + $w_aset[7] + $w_aset[8] + $w_aset[9] + $w_aset[10] + $w_aset[11];
 
         if (!empty($r['dokumen']) && file_exists($imgPath)) {
-            $imgX = $imgColStart + (($w_aset[11] - 14) / 2);
-            $imgY = $y + (($tinggi - 10) / 2);
-            $pdf->Image($imgPath, $imgX, $imgY, 14, 10);
+            $imgX = $imgColStart + (($w_aset[12] - 16) / 2);
+            $imgY = $y + (($tinggi - 12) / 2);
+            $pdf->Image($imgPath, $imgX, $imgY, 16, 12);
         } else {
             $pdf->SetXY($imgColStart, $y + 2);
-            $pdf->Cell($w_aset[11], $tinggi - 4, 'Tidak Ada', 0, 0, 'C');
+            $pdf->Cell($w_aset[12], $tinggi - 4, 'Tidak Ada', 0, 0, 'C');
         }
         $pdf->SetY($y + $tinggi);
     }
@@ -146,14 +169,14 @@ $pdf->Ln(10);
 
 
 // =========================================================================
-// SECTION 2: LAPORAN KERUSAKAN
+// SECTION 2: LAPORAN KERUSAKAN (UPDATE DARI KERUSAKAN_CETAK.PHP)
 // =========================================================================
-$w_rusak = [10, 40, 30, 20, 35, 25, 22, 25, 70];
-$header_rusak = ['No', 'Nama Aset', 'Lokasi Ruang', 'Kategori', 'Pelapor', 'Teknisi', 'Tanggal', 'Status', 'Rincian'];
+$w_rusak = [8, 33, 18, 23, 18, 22, 22, 18, 25, 90];
+$header_rusak = ['No', 'Nama Aset', 'Info Stok', 'Lokasi', 'Kategori', 'Pelapor', 'Teknisi', 'Tanggal', 'Status', 'Rincian Kerusakan'];
 
 function cetakHeaderLaporanKerusakan($pdf, $w, $header)
 {
-    $pdf->SetFont('Arial', 'B', 9);
+    $pdf->SetFont('Arial', 'B', 8);
     $pdf->SetFillColor(72, 201, 176);
     $pdf->SetTextColor(255);
     for ($i = 0; $i < count($header); $i++) {
@@ -167,15 +190,21 @@ function cetakHeaderLaporanKerusakan($pdf, $w, $header)
 if ($pdf->GetY() + 25 > 185) $pdf->AddPage();
 $pdf->SetFont('Arial', 'B', 11);
 $pdf->Cell(0, 8, '2. LAPORAN KERUSAKAN', 0, 1, 'L');
+
+$pdf->SetFont('Arial', 'I', 8);
+$pdf->SetTextColor(80, 80, 80);
+$pdf->Cell(0, 5, '*Keterangan Info Stok: ( T = Tersedia | R = Rusak )', 0, 1, 'L');
+$pdf->SetTextColor(0);
+
 cetakHeaderLaporanKerusakan($pdf, $w_rusak, $header_rusak);
 
 $where_rusak = [];
 if (!empty($tahun_filter)) $where_rusak[] = "YEAR(kerusakan.tanggal) = '$tahun_filter'";
 $whereSQL_rusak = count($where_rusak) ? 'WHERE ' . implode(' AND ', $where_rusak) : '';
 
-$sql_rusak = "SELECT kerusakan.*, aset.lokasi, aset.kategori_aset FROM kerusakan 
+$sql_rusak = "SELECT kerusakan.*, aset.lokasi, aset.kategori_aset, aset.stok_tersedia, aset.stok_rusak FROM kerusakan 
               LEFT JOIN aset ON kerusakan.nama_aset = aset.nama_aset COLLATE utf8mb4_general_ci
-              $whereSQL_rusak ORDER BY kerusakan.tanggal DESC, kerusakan.id DESC";
+              $whereSQL_rusak ORDER BY aset.kategori_aset ASC, kerusakan.id DESC";
 $res_rusak = mysqli_query($koneksi, $sql_rusak);
 
 if (mysqli_num_rows($res_rusak) == 0) {
@@ -184,15 +213,20 @@ if (mysqli_num_rows($res_rusak) == 0) {
     $no_rusak = 1;
     while ($r = mysqli_fetch_assoc($res_rusak)) {
         $nama_aset = $r['nama_aset'] ?? '-';
-        $lokasi    = $r['lokasi'] ?? '-';
-        $kategori  = $r['kategori_aset'] ?? '-';
-        $tanggal   = date('d-m-Y', strtotime($r['tanggal']));
-        $status    = $r['status'] ?? '-';
+        $lokasi    = !empty($r['lokasi']) ? $r['lokasi'] : '-';
+        $kategori  = !empty($r['kategori_aset']) ? $r['kategori_aset'] : '-';
+        $pelapor   = !empty($r['pelapor']) ? $r['pelapor'] : '-';
+        $teknisi   = !empty($r['teknisi']) ? $r['teknisi'] : '-';
+        $tanggal   = date('d/m/y', strtotime($r['tanggal']));
+        $status    = !empty($r['status']) ? $r['status'] : '-';
         $ket       = $r['keterangan'] ?? '-';
-        $teknisi   = $r['teknisi'] ?? '-';
-        $pelapor   = ($r['pelapor'] ?? '-') . "\n[" . ((isset($r['sumber']) && $r['sumber'] == 'App User') ? 'App User' : 'Admin') . "]";
 
-        $maxLine = max(2, ceil(strlen($nama_aset) / 20), ceil(strlen($lokasi) / 15), ceil(strlen($ket) / 45));
+        $stok_tersedia = isset($r['stok_tersedia']) ? $r['stok_tersedia'] : '0';
+        $stok_rusak    = isset($r['stok_rusak']) ? $r['stok_rusak'] : '0';
+        $info_stok     = "T: " . $stok_tersedia . " | R: " . $stok_rusak;
+
+        // Mempertahankan MultiCell agar layout rapi apabila data terlalu panjang
+        $maxLine = max(2, ceil(strlen($nama_aset) / 17), ceil(strlen($lokasi) / 11), ceil(strlen($ket) / 62));
         $tinggi = ($maxLine * 5) + 4;
 
         if ($pdf->GetY() + $tinggi > 185) {
@@ -212,20 +246,22 @@ if (mysqli_num_rows($res_rusak) == 0) {
         $pdf->Cell($w_rusak[0], 5, $no_rusak++, 0, 0, 'C');
         $pdf->SetXY($x + $w_rusak[0] + 1, $y + 2);
         $pdf->MultiCell($w_rusak[1] - 2, 5, $nama_aset, 0, 'L');
-        $pdf->SetXY($x + $w_rusak[0] + $w_rusak[1] + 1, $y + 2);
-        $pdf->MultiCell($w_rusak[2] - 2, 5, $lokasi, 0, 'L');
-        $pdf->SetXY($x + $w_rusak[0] + $w_rusak[1] + $w_rusak[2], $y + 2);
-        $pdf->Cell($w_rusak[3], 5, $kategori, 0, 0, 'C');
-        $pdf->SetXY($x + $w_rusak[0] + $w_rusak[1] + $w_rusak[2] + $w_rusak[3] + 1, $y + 2);
-        $pdf->MultiCell($w_rusak[4] - 2, 5, $pelapor, 0, 'L');
+        $pdf->SetXY($x + $w_rusak[0] + $w_rusak[1], $y + 2);
+        $pdf->Cell($w_rusak[2], 5, $info_stok, 0, 0, 'C');
+        $pdf->SetXY($x + $w_rusak[0] + $w_rusak[1] + $w_rusak[2] + 1, $y + 2);
+        $pdf->MultiCell($w_rusak[3] - 2, 5, $lokasi, 0, 'L');
+        $pdf->SetXY($x + $w_rusak[0] + $w_rusak[1] + $w_rusak[2] + $w_rusak[3], $y + 2);
+        $pdf->Cell($w_rusak[4], 5, $kategori, 0, 0, 'C');
         $pdf->SetXY($x + $w_rusak[0] + $w_rusak[1] + $w_rusak[2] + $w_rusak[3] + $w_rusak[4] + 1, $y + 2);
-        $pdf->MultiCell($w_rusak[5] - 2, 5, $teknisi, 0, 'L');
-        $pdf->SetXY($x + $w_rusak[0] + $w_rusak[1] + $w_rusak[2] + $w_rusak[3] + $w_rusak[4] + $w_rusak[5], $y + 2);
-        $pdf->Cell($w_rusak[6], 5, $tanggal, 0, 0, 'C');
+        $pdf->MultiCell($w_rusak[5] - 2, 5, $pelapor, 0, 'L');
+        $pdf->SetXY($x + $w_rusak[0] + $w_rusak[1] + $w_rusak[2] + $w_rusak[3] + $w_rusak[4] + $w_rusak[5] + 1, $y + 2);
+        $pdf->MultiCell($w_rusak[6] - 2, 5, $teknisi, 0, 'L');
         $pdf->SetXY($x + $w_rusak[0] + $w_rusak[1] + $w_rusak[2] + $w_rusak[3] + $w_rusak[4] + $w_rusak[5] + $w_rusak[6], $y + 2);
-        $pdf->Cell($w_rusak[7], 5, $status, 0, 0, 'C');
-        $pdf->SetXY($x + $w_rusak[0] + $w_rusak[1] + $w_rusak[2] + $w_rusak[3] + $w_rusak[4] + $w_rusak[5] + $w_rusak[6] + $w_rusak[7] + 1, $y + 2);
-        $pdf->MultiCell($w_rusak[8] - 2, 5, $ket, 0, 'L');
+        $pdf->Cell($w_rusak[7], 5, $tanggal, 0, 0, 'C');
+        $pdf->SetXY($x + $w_rusak[0] + $w_rusak[1] + $w_rusak[2] + $w_rusak[3] + $w_rusak[4] + $w_rusak[5] + $w_rusak[6] + $w_rusak[7], $y + 2);
+        $pdf->Cell($w_rusak[8], 5, $status, 0, 0, 'C');
+        $pdf->SetXY($x + $w_rusak[0] + $w_rusak[1] + $w_rusak[2] + $w_rusak[3] + $w_rusak[4] + $w_rusak[5] + $w_rusak[6] + $w_rusak[7] + $w_rusak[8] + 1, $y + 2);
+        $pdf->MultiCell($w_rusak[9] - 2, 5, $ket, 0, 'L');
         $pdf->SetY($y + $tinggi);
     }
 }
@@ -574,7 +610,7 @@ $pdf->Ln(10);
 
 
 // =========================================================================
-// SECTION 7: LAPORAN HASIL AUDIT FISIK (DIPERBARUI)
+// SECTION 7: LAPORAN HASIL AUDIT FISIK
 // =========================================================================
 $w_audit = [10, 38, 22, 25, 25, 20, 20, 25, 92];
 $header_audit = ['No', 'Nama Aset', 'Kategori', 'Lokasi', 'Auditor', 'Tgl Audit', 'Kondisi', 'Bukti Fisik', 'Keterangan Tambahan'];
@@ -620,9 +656,8 @@ if (mysqli_num_rows($res_audit) == 0) {
         $kondisi   = $r['kondisi_fisik'] ?? '-';
         $keterangan = $r['keterangan'] ?? '-';
 
-        // Hitung Tinggi Baris (Penyediaan ruang untuk gambar jika ada)
         $maxLine = max(
-            3, // Pastikan tinggi baris cukup lebar untuk image (15mm)
+            3,
             ceil(strlen($nama_aset) / 22),
             ceil(strlen($keterangan) / 60)
         );
@@ -662,7 +697,6 @@ if (mysqli_num_rows($res_audit) == 0) {
         $pdf->SetXY($x + $w_audit[0] + $w_audit[1] + $w_audit[2] + $w_audit[3] + $w_audit[4] + $w_audit[5], $y + 2);
         $pdf->Cell($w_audit[6], 5, $kondisi, 0, 0, 'C');
 
-        // Render Gambar ke dalam sel Bukti Fisik
         $imgPath = __DIR__ . '/../assets/img/' . ($r['gambar_rusak'] ?? '');
         $imgColStart = $x + $w_audit[0] + $w_audit[1] + $w_audit[2] + $w_audit[3] + $w_audit[4] + $w_audit[5] + $w_audit[6];
 
@@ -687,10 +721,10 @@ $pdf->Ln(10);
 
 
 // =========================================================================
-// SECTION 8: LAPORAN REKAPITULASI NILAI ASET
+// SECTION 8: LAPORAN REKAPITULASI NILAI ASET (UPDATE DARI LAPORAN_NILAI_CETAK.PHP)
 // =========================================================================
-$w_nilai = [10, 60, 25, 22, 20, 45, 40, 55];
-$header_nilai = ['No', 'Nama Aset', 'Kategori', 'Thn Masuk', 'Umur Eko.', 'Harga Beli Awal', 'Susut / Tahun', 'Nilai Saat Ini'];
+$w_nilai = [10, 55, 25, 22, 15, 15, 40, 40, 55]; // Total: 277 mm
+$header_nilai = ['No', 'Nama Aset', 'Kategori', 'Thn Masuk', 'Umur', 'Stok', 'Harga Total Awal', 'Susut / Tahun', 'Nilai Saat Ini'];
 
 function cetakHeaderNilai($pdf, $w, $header)
 {
@@ -728,27 +762,32 @@ if (mysqli_num_rows($res_nilai) == 0) {
     while ($r = mysqli_fetch_assoc($res_nilai)) {
         $nama_aset = $r['nama_aset'];
         $kategori  = $r['kategori_aset'] ?? '-';
-        $harga     = $r['harga'];
+
+        // Logika Nilai yang dikali dengan total stok dari update laporan_nilai_cetak.php
+        $stok      = (int)($r['total_stok'] ?? 0);
+        $harga_total = $r['harga'] * $stok; // Hitung berdasarkan stok
+
         $umur      = isset($r['umur_ekonomis']) ? (int)$r['umur_ekonomis'] : 0;
         $tgl_masuk = $r['tanggal_masuk'];
         $thn_masuk = date('Y', strtotime($tgl_masuk));
 
         $susut_per_tahun = 0;
-        $nilai_sekarang = $harga;
+        $nilai_sekarang = $harga_total;
 
         if ($umur > 0) {
-            $susut_per_tahun = $harga / $umur;
+            $susut_per_tahun = $harga_total / $umur;
             $pakai = $tahun_sekarang - $thn_masuk;
             if ($pakai < 0) $pakai = 0;
             if ($pakai > $umur) $pakai = $umur;
+
             $akumulasi = $pakai * $susut_per_tahun;
-            $nilai_sekarang = $harga - $akumulasi;
+            $nilai_sekarang = $harga_total - $akumulasi;
         }
 
-        $total_harga_awal += $harga;
+        $total_harga_awal += $harga_total;
         $total_nilai_saat_ini += $nilai_sekarang;
 
-        if (strlen($nama_aset) > 30) $nama_aset = substr($nama_aset, 0, 27) . '...';
+        if (strlen($nama_aset) > 28) $nama_aset = substr($nama_aset, 0, 25) . '...';
 
         if ($pdf->GetY() > 180) {
             $pdf->AddPage();
@@ -760,14 +799,13 @@ if (mysqli_num_rows($res_nilai) == 0) {
         $pdf->Cell($w_nilai[2], 8, $kategori, 1, 0, 'C');
         $pdf->Cell($w_nilai[3], 8, $thn_masuk, 1, 0, 'C');
         $pdf->Cell($w_nilai[4], 8, ($umur > 0 ? $umur . " Thn" : "-"), 1, 0, 'C');
-        $pdf->Cell($w_nilai[5], 8, 'Rp ' . number_format($harga, 0, ',', '.'), 1, 0, 'R');
-
+        $pdf->Cell($w_nilai[5], 8, $stok, 1, 0, 'C');
+        $pdf->Cell($w_nilai[6], 8, 'Rp ' . number_format($harga_total, 0, ',', '.'), 1, 0, 'R');
         $pdf->SetTextColor(220, 53, 69);
-        $pdf->Cell($w_nilai[6], 8, '- Rp ' . number_format($susut_per_tahun, 0, ',', '.'), 1, 0, 'R');
+        $pdf->Cell($w_nilai[7], 8, '- Rp ' . number_format($susut_per_tahun, 0, ',', '.'), 1, 0, 'R');
         $pdf->SetTextColor(0);
-
         $pdf->SetFont('Arial', 'B', 8);
-        $pdf->Cell($w_nilai[7], 8, 'Rp ' . number_format($nilai_sekarang, 0, ',', '.'), 1, 1, 'R');
+        $pdf->Cell($w_nilai[8], 8, 'Rp ' . number_format($nilai_sekarang, 0, ',', '.'), 1, 1, 'R');
         $pdf->SetFont('Arial', '', 8);
     }
 }
@@ -775,11 +813,11 @@ if (mysqli_num_rows($res_nilai) == 0) {
 // Baris Total Akumulasi Nilai Aset
 $pdf->SetFont('Arial', 'B', 9);
 $pdf->SetFillColor(240, 240, 240);
-$pdf->Cell($w_nilai[0] + $w_nilai[1] + $w_nilai[2] + $w_nilai[3] + $w_nilai[4], 10, 'TOTAL KESELURUHAN NILAI INVESTASI ASET', 1, 0, 'R', true);
-$pdf->Cell($w_nilai[5], 10, 'Rp ' . number_format($total_harga_awal, 0, ',', '.'), 1, 0, 'R', true);
-$pdf->Cell($w_nilai[6], 10, '', 1, 0, 'C', true);
+$pdf->Cell($w_nilai[0] + $w_nilai[1] + $w_nilai[2] + $w_nilai[3] + $w_nilai[4] + $w_nilai[5], 10, 'TOTAL KESELURUHAN NILAI INVESTASI ASET', 1, 0, 'R', true);
+$pdf->Cell($w_nilai[6], 10, 'Rp ' . number_format($total_harga_awal, 0, ',', '.'), 1, 0, 'R', true);
+$pdf->Cell($w_nilai[7], 10, '', 1, 0, 'C', true);
 $pdf->SetTextColor(25, 135, 84);
-$pdf->Cell($w_nilai[7], 10, 'Rp ' . number_format($total_nilai_saat_ini, 0, ',', '.'), 1, 1, 'R', true);
+$pdf->Cell($w_nilai[8], 10, 'Rp ' . number_format($total_nilai_saat_ini, 0, ',', '.'), 1, 1, 'R', true);
 $pdf->SetTextColor(0);
 $pdf->SetFont('Arial', '', 8);
 $pdf->Ln(10);

@@ -119,18 +119,12 @@ $is_ahmad = (strpos(strtolower($nama_user), 'ahmad') !== false);
             <a href="kerusakan.php" class="list-group-item">
                 <i class="bi bi-exclamation-octagon"></i> Laporan Kerusakan
             </a>
-            <a href="kerusakan.php?status=Diproses" class="list-group-item">
-                <i class="bi bi-gear-wide-connected"></i> Progress Kerja Perbaikan
-            </a>
         <?php endif; ?>
 
         <?php if ($is_ahmad) : ?>
             <div class="menu-category">Manajemen Pemeliharaan</div>
             <a href="perawatan.php" class="list-group-item">
-                <i class="bi bi-tools"></i> Jadwal Perawatan Rutin
-            </a>
-            <a href="perawatan.php" class="list-group-item">
-                <i class="bi bi-activity"></i> Agenda Kalibrasi Alat Medis
+                <i class="bi bi-tools"></i> Jadwal Perawatan/Pemiliharaan Dan Kalibrasi Rutin
             </a>
         <?php endif; ?>
 
