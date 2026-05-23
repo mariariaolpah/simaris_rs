@@ -17,34 +17,51 @@ if (!$k) {
 }
 
 if (isset($_POST['update'])) {
-    $nama_aset  = mysqli_real_escape_string($koneksi, $_POST['nama_aset']);
-    $status     = mysqli_real_escape_string($koneksi, $_POST['status']);
-    $tanggal    = mysqli_real_escape_string($koneksi, $_POST['tanggal']);
-    $keterangan = mysqli_real_escape_string($koneksi, $_POST['keterangan']);
-    $pelapor    = mysqli_real_escape_string($koneksi, $_POST['pelapor']);
-    $teknisi    = mysqli_real_escape_string($koneksi, $_POST['teknisi']); // Menangkap data teknisi
+    $nama_aset   = mysqli_real_escape_string($koneksi, $_POST['nama_aset']);
+    $status_baru = mysqli_real_escape_string($koneksi, $_POST['status']);
+    $tanggal     = mysqli_real_escape_string($koneksi, $_POST['tanggal']);
+    $keterangan  = mysqli_real_escape_string($koneksi, $_POST['keterangan']);
+    $pelapor     = mysqli_real_escape_string($koneksi, $_POST['pelapor']);
+    $teknisi     = mysqli_real_escape_string($koneksi, $_POST['teknisi']);
 
-    // QUERY UPDATE DATA ASLI (Menambahkan kolom teknisi)
+    $status_lama = $k['status']; // Tangkap status sebelum diubah
+
+    // QUERY UPDATE DATA ASLI 
     $update_query = mysqli_query($koneksi, "UPDATE kerusakan SET 
                     nama_aset='$nama_aset', 
-                    status='$status', 
+                    status='$status_baru', 
                     tanggal='$tanggal', 
                     keterangan='$keterangan',
                     pelapor='$pelapor',
                     teknisi='$teknisi' 
                     WHERE id=$id");
 
-    // SINKRONISASI KONDISI KE TABEL MASTER ASET (OPSIONAL AGAR SEIRAMA)
+    // [MODIFIKASI] SINKRONISASI STOK OTOMATIS BERDASARKAN PERUBAHAN STATUS
     if ($update_query) {
-        if ($status == "Rusak") {
-            mysqli_query($koneksi, "UPDATE aset SET kondisi='Rusak' WHERE nama_aset='$nama_aset' LIMIT 1");
-        } elseif ($status == "Perlu Perawatan" || $status == "Dalam Perbaikan") {
-            mysqli_query($koneksi, "UPDATE aset SET kondisi='Perlu Perawatan' WHERE nama_aset='$nama_aset' LIMIT 1");
-        } elseif ($status == "Selesai Diperbaiki") {
-            mysqli_query($koneksi, "UPDATE aset SET kondisi='Baik' WHERE nama_aset='$nama_aset' LIMIT 1");
+        // Jika statusnya berubah (misal dari Rusak menjadi Selesai Diperbaiki)
+        if ($status_lama != $status_baru) {
+
+            // 1. Cabut/Kurangi angka dari kategori stok yang LAMA
+            if ($status_lama == "Rusak") {
+                mysqli_query($koneksi, "UPDATE aset SET stok_rusak = stok_rusak - 1 WHERE nama_aset='$nama_aset'");
+            } elseif ($status_lama == "Perlu Perawatan" || $status_lama == "Dalam Perbaikan") {
+                mysqli_query($koneksi, "UPDATE aset SET stok_perawatan = stok_perawatan - 1 WHERE nama_aset='$nama_aset'");
+            } elseif ($status_lama == "Selesai Diperbaiki") {
+                // Jaga-jaga kalau barang yang sudah selesai ternyata rusak lagi saat di edit
+                mysqli_query($koneksi, "UPDATE aset SET stok_tersedia = stok_tersedia - 1 WHERE nama_aset='$nama_aset'");
+            }
+
+            // 2. Masukkan/Tambahkan angka ke kategori stok yang BARU
+            if ($status_baru == "Rusak") {
+                mysqli_query($koneksi, "UPDATE aset SET stok_rusak = stok_rusak + 1 WHERE nama_aset='$nama_aset'");
+            } elseif ($status_baru == "Perlu Perawatan" || $status_baru == "Dalam Perbaikan") {
+                mysqli_query($koneksi, "UPDATE aset SET stok_perawatan = stok_perawatan + 1 WHERE nama_aset='$nama_aset'");
+            } elseif ($status_baru == "Selesai Diperbaiki") {
+                mysqli_query($koneksi, "UPDATE aset SET stok_tersedia = stok_tersedia + 1 WHERE nama_aset='$nama_aset'");
+            }
         }
 
-        echo "<script>alert('Data kerusakan berhasil diperbarui!');window.location='kerusakan.php';</script>";
+        echo "<script>alert('Data laporan dan stok berhasil diperbarui!');window.location='kerusakan.php';</script>";
     } else {
         echo "<script>alert('Gagal memperbarui data kerusakan!');</script>";
     }
@@ -177,7 +194,7 @@ if (isset($_POST['update'])) {
 
                             <div class="highlight-danger">
                                 <h6 class="fw-bold text-danger mb-1"><i class="bi bi-shield-fill-exclamation"></i> Pembaruan Status Tindak Lanjut</h6>
-                                <small class="text-secondary d-block">Merubah status ke **"Selesai Diperbaiki"** akan mengembalikan kondisi fisik aset utama di menu inventaris menjadi **"Baik"** secara otomatis.</small>
+                                <small class="text-secondary d-block">Merubah status ke **"Selesai Diperbaiki"** akan mengembalikan dan memulihkan stok **Tersedia** di menu inventaris secara otomatis.</small>
                             </div>
 
                             <div class="row">
@@ -192,7 +209,17 @@ if (isset($_POST['update'])) {
                                 </div>
                                 <div class="col-md-4 mb-4">
                                     <label class="form-label">Ditangani Teknisi</label>
-                                    <input type="text" name="teknisi" class="form-control" placeholder="Nama Teknisi..." value="<?= htmlspecialchars($k['teknisi'] ?? '') ?>">
+                                    <select name="teknisi" class="form-select border-primary">
+                                        <option value="">-- Pilih Teknisi --</option>
+                                        <?php
+                                        // Menarik nama pengguna dengan level teknisi, lalu di-selected jika sesuai dengan yang di database
+                                        $query_teknisi = mysqli_query($koneksi, "SELECT nama_pengguna FROM pengguna WHERE level = 'teknisi' AND status = 'aktif'");
+                                        while ($t = mysqli_fetch_assoc($query_teknisi)) {
+                                            $selected = ($t['nama_pengguna'] == $k['teknisi']) ? 'selected' : '';
+                                            echo "<option value='" . htmlspecialchars($t['nama_pengguna']) . "' $selected>" . htmlspecialchars($t['nama_pengguna']) . "</option>";
+                                        }
+                                        ?>
+                                    </select>
                                 </div>
                                 <div class="col-md-4 mb-4">
                                     <label class="form-label">Tanggal Pembaruan</label>

@@ -14,6 +14,7 @@ $offset = ($page - 1) * $batas;
 
 $search = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : "";
 $kategori_filter = isset($_GET['kategori']) ? $_GET['kategori'] : 'medis';
+$status_filter = isset($_GET['status']) ? mysqli_real_escape_string($koneksi, $_GET['status']) : ""; // [TAMBAHAN] Filter Status
 
 $whereConditions = [];
 if ($search != '') {
@@ -26,10 +27,20 @@ if ($kategori_filter == 'medis') {
     $whereConditions[] = "aset.kategori_aset = 'Non-Medis'";
 }
 
+// [TAMBAHAN] Kondisi filter status ke dalam SQL query
+if ($status_filter != '') {
+    $whereConditions[] = "peminjaman.status_pinjam = '$status_filter'";
+}
+
 $whereClause = "";
 if (count($whereConditions) > 0) {
     $whereClause = "WHERE " . implode(" AND ", $whereConditions);
 }
+
+// [TAMBAHAN] Helper URL parameter agar pagination, filter status, dan tab tidak saling mereset
+$url_params = "";
+if ($search != '') $url_params .= '&search=' . urlencode($search);
+if ($status_filter != '') $url_params .= '&status=' . urlencode($status_filter);
 
 /* ================= TOTAL DATA ================= */
 $totalData = mysqli_fetch_assoc(mysqli_query(
@@ -43,8 +54,9 @@ $totalData = mysqli_fetch_assoc(mysqli_query(
 $totalPage = ceil($totalData / $batas);
 
 /* ================= QUERY DATA ================= */
+// [MODIFIKASI] Memanggil field stok_tersedia dari tabel aset agar sinkron
 $query = mysqli_query($koneksi, "
-    SELECT peminjaman.*, aset.nama_aset, aset.kategori_aset, aset.lokasi 
+    SELECT peminjaman.*, aset.nama_aset, aset.kategori_aset, aset.lokasi, aset.stok_tersedia 
     FROM peminjaman 
     JOIN aset ON peminjaman.id_aset = aset.id_aset 
     $whereClause
@@ -236,27 +248,35 @@ $query = mysqli_query($koneksi, "
                         <div class="d-flex gap-2">
                             <form method="GET" class="d-flex gap-1 align-items-center">
                                 <input type="hidden" name="kategori" value="<?= htmlspecialchars($kategori_filter) ?>">
+
+                                <select name="status" class="form-select form-select-sm bg-light text-dark border-0" style="border-radius: 6px; cursor: pointer; min-width: 150px;">
+                                    <option value="">Semua Status</option>
+                                    <option value="Menunggu Persetujuan" <?= ($status_filter == 'Menunggu Persetujuan') ? 'selected' : '' ?>>Menunggu Persetujuan</option>
+                                    <option value="Dipinjam" <?= ($status_filter == 'Dipinjam') ? 'selected' : '' ?>>Sedang Dipinjam</option>
+                                    <option value="Dikembalikan" <?= ($status_filter == 'Dikembalikan') ? 'selected' : '' ?>>Dikembalikan</option>
+                                </select>
+
                                 <input type="text" name="search" class="form-control form-control-sm bg-light text-dark border-0" placeholder="Cari peminjam / alat..." style="border-radius: 6px; padding: 6px 12px;" value="<?= htmlspecialchars($search) ?>">
                                 <button class="btn btn-light btn-sm text-dark" style="border-radius: 6px;"><i class="bi bi-search"></i></button>
                             </form>
                             <a href="peminjaman_tambah.php" class="btn btn-light btn-sm" style="border-radius: 6px;"><i class="bi bi-plus-lg"></i> Tambah</a>
-                            <a href="peminjaman_cetak.php?kategori=<?= $kategori_filter ?>&search=<?= urlencode($search) ?>" class="btn btn-light btn-sm" style="border-radius: 6px;"><i class="bi bi-file-earmark-pdf"></i> Cetak PDF</a>
+                            <a href="peminjaman_cetak.php?kategori=<?= $kategori_filter ?><?= $url_params ?>" class="btn btn-light btn-sm" style="border-radius: 6px;"><i class="bi bi-file-earmark-pdf"></i> Cetak PDF</a>
                         </div>
                     </div>
 
                     <ul class="nav nav-tabs">
                         <li class="nav-item">
-                            <a class="nav-link <?= ($kategori_filter == 'medis') ? 'active-medis' : '' ?>" href="?kategori=medis<?= $search ? '&search=' . urlencode($search) : '' ?>">
-                                🩺 Aset Medis (Alkes)
+                            <a class="nav-link <?= ($kategori_filter == 'medis') ? 'active-medis' : '' ?>" href="?kategori=medis<?= $url_params ?>">
+                                ⚕️ Aset Medis (Alkes)
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link <?= ($kategori_filter == 'non-medis') ? 'active-nonmedis' : '' ?>" href="?kategori=non-medis<?= $search ? '&search=' . urlencode($search) : '' ?>">
-                                🗄️ Aset Non-Medis
+                            <a class="nav-link <?= ($kategori_filter == 'non-medis') ? 'active-nonmedis' : '' ?>" href="?kategori=non-medis<?= $url_params ?>">
+                                🖥️ Aset Non-Medis
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link <?= ($kategori_filter == 'semua') ? 'active-semua' : '' ?>" href="?kategori=semua<?= $search ? '&search=' . urlencode($search) : '' ?>">
+                            <a class="nav-link <?= ($kategori_filter == 'semua') ? 'active-semua' : '' ?>" href="?kategori=semua<?= $url_params ?>">
                                 📦 Semua Aset
                             </a>
                         </li>
@@ -269,7 +289,7 @@ $query = mysqli_query($koneksi, "
                                     <tr>
                                         <th style="width: 50px;">No</th>
                                         <th>Peminjam</th>
-                                        <th>Nama Alat</th>
+                                        <th>Nama Alat & Sisa Stok</th>
                                         <th>Kategori</th>
                                         <th>Lokasi Asal</th>
                                         <th>Tgl Pinjam</th>
@@ -303,7 +323,12 @@ $query = mysqli_query($koneksi, "
                                                     <?php endif; ?>
                                                 </td>
 
-                                                <td class="text-start"><?= htmlspecialchars($row['nama_aset']) ?></td>
+                                                <td class="text-start">
+                                                    <span class="fw-bold text-dark d-block mb-1"><?= htmlspecialchars($row['nama_aset']) ?></span>
+                                                    <span class="badge bg-info text-white rounded-pill fw-normal" style="font-size: 0.75rem;" title="Jumlah sisa stok alat saat ini">
+                                                        Sisa Stok: <?= isset($row['stok_tersedia']) ? htmlspecialchars($row['stok_tersedia']) : '0' ?> Unit
+                                                    </span>
+                                                </td>
 
                                                 <td>
                                                     <?php if (isset($row['kategori_aset']) && $row['kategori_aset'] == 'Medis'): ?>
@@ -359,13 +384,13 @@ $query = mysqli_query($koneksi, "
                             <nav>
                                 <ul class="pagination pagination-sm mb-0">
                                     <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
-                                        <a class="page-link" style="border-radius: 6px 0 0 6px;" href="?page=<?= $page - 1 ?>&kategori=<?= $kategori_filter ?>&search=<?= urlencode($search) ?>">Prev</a>
+                                        <a class="page-link" style="border-radius: 6px 0 0 6px;" href="?page=<?= $page - 1 ?>&kategori=<?= $kategori_filter ?><?= $url_params ?>">Prev</a>
                                     </li>
                                     <li class="page-item disabled">
                                         <span class="page-link bg-light text-dark fw-bold"><?= $page ?> / <?= max(1, $totalPage) ?></span>
                                     </li>
                                     <li class="page-item <?= ($page >= $totalPage) ? 'disabled' : '' ?>">
-                                        <a class="page-link" style="border-radius: 0 6px 6px 0;" href="?page=<?= $page + 1 ?>&kategori=<?= $kategori_filter ?>&search=<?= urlencode($search) ?>">Next</a>
+                                        <a class="page-link" style="border-radius: 0 6px 6px 0;" href="?page=<?= $page + 1 ?>&kategori=<?= $kategori_filter ?><?= $url_params ?>">Next</a>
                                     </li>
                                 </ul>
                             </nav>
@@ -385,16 +410,14 @@ $query = mysqli_query($koneksi, "
         let originalTitle = "Peminjaman Alat | SIMARIS";
         let isBlinking = false;
 
-        // Fungsi untuk membuat Tab Browser kelap-kelip
         function startBlinkingTitle(pesan) {
             if (isBlinking) return;
             isBlinking = true;
             blinkInterval = setInterval(function() {
                 document.title = (document.title === originalTitle) ? pesan : originalTitle;
-            }, 1000); // Berganti setiap 1 detik
+            }, 1000);
         }
 
-        // Fungsi untuk menghentikan kelap-kelip saat admin klik layar
         function stopBlinkingTitle() {
             if (isBlinking) {
                 clearInterval(blinkInterval);
@@ -403,10 +426,8 @@ $query = mysqli_query($koneksi, "
             }
         }
 
-        // Hentikan kedipan jika Admin mengklik area mana saja di halaman
         document.body.addEventListener('click', stopBlinkingTitle);
 
-        // Fungsi untuk mengecek notifikasi baru ke database
         function cekNotifikasi() {
             $.ajax({
                 url: 'peminjaman_cek_notif.php',
@@ -414,16 +435,13 @@ $query = mysqli_query($koneksi, "
                 dataType: 'json',
                 success: function(response) {
                     if (response.pending_count > lastPendingCount) {
-                        // 1. Memicu Tab Kelap-kelip
-                        startBlinkingTitle("🔴 [" + response.pending_count + "] PENGAJUAN BARU!");
+                        startBlinkingTitle("🔔 [" + response.pending_count + "] PENGAJUAN BARU!");
 
-                        // 2. Tampilkan Pop Up Kanan Atas
                         let toastEl = document.getElementById('notifToast');
                         let toast = new bootstrap.Toast(toastEl);
                         document.getElementById('notifMessage').innerText = "Ada " + response.pending_count + " pengajuan baru yang menunggu persetujuan!";
                         toast.show();
 
-                        // 3. Reload otomatis halaman setelah 4 detik biar datanya muncul
                         setTimeout(function() {
                             location.reload();
                         }, 4000);
@@ -433,7 +451,6 @@ $query = mysqli_query($koneksi, "
             });
         }
 
-        // Cek saat halaman pertama kali dibuka
         $(document).ready(function() {
             $.ajax({
                 url: 'peminjaman_cek_notif.php',
@@ -443,8 +460,7 @@ $query = mysqli_query($koneksi, "
                     lastPendingCount = response.pending_count;
 
                     if (lastPendingCount > 0) {
-                        // Jika saat dibuka memang ada yang pending, langsung kelap-kelip
-                        startBlinkingTitle("🔴 [" + lastPendingCount + "] MENUNGGU PERSETUJUAN!");
+                        startBlinkingTitle("🔔 [" + lastPendingCount + "] MENUNGGU PERSETUJUAN!");
 
                         let toastEl = document.getElementById('notifToast');
                         let toast = new bootstrap.Toast(toastEl);
@@ -455,7 +471,6 @@ $query = mysqli_query($koneksi, "
             });
         });
 
-        // Jalankan pengecekan setiap 10 detik
         setInterval(cekNotifikasi, 10000);
     </script>
 </body>

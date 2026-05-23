@@ -35,7 +35,8 @@ $sql = "SELECT
             peminjaman.*,
             aset.nama_aset,
             aset.kategori_aset,
-            aset.lokasi
+            aset.lokasi,
+            aset.stok_tersedia
         FROM peminjaman
         JOIN aset ON peminjaman.id_aset = aset.id_aset
         $whereClause
@@ -74,7 +75,7 @@ $pdf->Ln(4);
 
 // ================= HEADER TABEL ================= //
 $w = [10, 40, 70, 28, 45, 25, 25, 30]; // Total 273mm
-$header = ['No', 'Peminjam', 'Nama Alat', 'Kategori', 'Lokasi Asal', 'Tgl Pinjam', 'Tgl Kembali', 'Status'];
+$header = ['No', 'Peminjam', 'Nama Alat & Stok', 'Kategori', 'Lokasi Asal', 'Tgl Pinjam', 'Tgl Kembali', 'Status'];
 
 function cetakHeaderPeminjaman($pdf, $w, $header)
 {
@@ -101,6 +102,9 @@ if (mysqli_num_rows($result) > 0) {
         $peminjam = $peminjam_nama . "\n[" . $sumber_label . "]";
 
         $nama_aset = $row['nama_aset'] ?? '-';
+        $stok_tersedia = $row['stok_tersedia'] ?? '0';
+        $alat_stok = $nama_aset . "\n[Sisa: " . $stok_tersedia . " Unit]";
+
         $kategori = $row['kategori_aset'] ?? '-';
         $lokasi = $row['lokasi'] ?? '-';
 
@@ -110,7 +114,7 @@ if (mysqli_num_rows($result) > 0) {
 
         $maxLine = max(
             2,
-            ceil(strlen($nama_aset) / 40),
+            ceil(strlen($nama_aset) / 40) + 1, // Ditambah 1 baris untuk teks sisa stok
             ceil(strlen($kategori) / 18),
             ceil(strlen($lokasi) / 25)
         );
@@ -140,7 +144,7 @@ if (mysqli_num_rows($result) > 0) {
         $pdf->MultiCell($w[1] - 2, 5, $peminjam, 0, 'L');
 
         $pdf->SetXY($x + $w[0] + $w[1] + 1, $y + 2);
-        $pdf->MultiCell($w[2] - 2, 5, $nama_aset, 0, 'L');
+        $pdf->MultiCell($w[2] - 2, 5, $alat_stok, 0, 'L');
 
         $pdf->SetXY($x + $w[0] + $w[1] + $w[2] + 1, $y + 2);
         $pdf->MultiCell($w[3] - 2, 5, $kategori, 0, 'C');

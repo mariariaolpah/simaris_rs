@@ -25,11 +25,16 @@ if (isset($_POST['login'])) {
 
                 $_SESSION['id_pengguna'] = $user['id_pengguna'];
                 $_SESSION['nama_pengguna'] = $user['nama_pengguna'];
+
+                // Gunakan prioritas 'level' dari database
+                $_SESSION['level'] = $user['level'];
                 $_SESSION['role'] = $user['role'];
-                $_SESSION['level'] = $user['role']; // <--- INI BARIS PENYELAMATNYA
-                // arahkan
-                if ($user['role'] == 'admin') {
+
+                // --- INI KUNCI ARAHANNYA ---
+                if ($user['level'] == 'admin' || $user['role'] == 'admin') {
                     header("Location: pages/dashboard.php");
+                } elseif ($user['level'] == 'teknisi' || $user['role'] == 'teknisi') {
+                    header("Location: pages/dashboard_teknisi.php");
                 } else {
                     header("Location: pages/dashboard_user.php");
                 }
@@ -43,7 +48,6 @@ if (isset($_POST['login'])) {
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="id">
 
@@ -187,13 +191,11 @@ if (isset($_POST['login'])) {
 
 <body>
 
-    <!-- SVG LATAR -->
     <svg class="wave-bg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 800">
         <polygon fill="#1a73e8" points="0,800 1440,0 1440,200 0,1000" />
         <polygon fill="#00b4d8" points="0,400 1440,100 1440,300 0,900" />
     </svg>
 
-    <!-- FORM LOGIN -->
     <div class="login-wrapper">
         <div class="login-card">
             <img src="assets/img/logo.png" alt="Logo RS Bhayangkara">
@@ -207,13 +209,11 @@ if (isset($_POST['login'])) {
             <form method="post" action="" autocomplete="off">
                 <p class="login-subtitle">Silahkan Login !</p>
 
-                <!-- Username -->
                 <div class="mb-3 text-start">
                     <label class="form-label">Username</label>
                     <input type="text" name="username" class="form-control" placeholder="Masukkan username Anda" required autocomplete="off">
                 </div>
 
-                <!-- Password -->
                 <div class="mb-3 text-start">
                     <label class="form-label">Password</label>
                     <input type="password" name="password" class="form-control" placeholder="Masukkan password Anda" required autocomplete="new-password">
@@ -235,22 +235,14 @@ if (isset($_POST['login'])) {
         © 2025 SIMARIS | RS Bhayangkara Banjarmasin
     </footer>
 
-    <!-- Script untuk reset input saat load dan fokus -->
     <script>
         window.addEventListener('DOMContentLoaded', () => {
             const usernameInput = document.querySelector('input[name="username"]');
             const passwordInput = document.querySelector('input[name="password"]');
-
-            // Kosongkan input saat halaman dimuat
             if (usernameInput) usernameInput.value = '';
             if (passwordInput) passwordInput.value = '';
-
-            // Hapus otomatis saat fokus
-            if (usernameInput) usernameInput.addEventListener('focus', () => usernameInput.value = '');
-            if (passwordInput) passwordInput.addEventListener('focus', () => passwordInput.value = '');
         });
     </script>
-
 </body>
 
 </html>

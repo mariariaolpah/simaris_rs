@@ -22,7 +22,6 @@ $kategori_filter = isset($_GET['kategori']) ? $_GET['kategori'] : 'medis';
 $whereConditions = [];
 
 if ($search != '') {
-    // Menambahkan pencarian berdasarkan nama teknisi agar mempermudah admin
     $whereConditions[] = "(kerusakan.nama_aset LIKE '%$search%' 
         OR kerusakan.status LIKE '%$search%' 
         OR kerusakan.keterangan LIKE '%$search%'
@@ -35,6 +34,12 @@ if ($kategori_filter == 'medis') {
     $whereConditions[] = "aset.kategori_aset = 'Medis'";
 } elseif ($kategori_filter == 'non-medis') {
     $whereConditions[] = "aset.kategori_aset = 'Non-Medis'";
+}
+
+// ==== PROTEKSI & FILTER KHUSUS ROLE TEKNISI ====
+if (isset($_SESSION['level']) && $_SESSION['level'] == 'teknisi') {
+    $nama_teknisi = mysqli_real_escape_string($koneksi, $_SESSION['nama_pengguna']);
+    $whereConditions[] = "kerusakan.teknisi = '$nama_teknisi'";
 }
 
 $whereClause = "";
@@ -59,7 +64,10 @@ $query = mysqli_query($koneksi, "
         kerusakan.*,
         kerusakan.tanggal AS tanggal_lapor,
         aset.kategori_aset,
-        aset.lokasi 
+        aset.lokasi,
+        aset.stok_tersedia,
+        aset.stok_rusak,
+        aset.stok_perawatan
     FROM kerusakan 
     LEFT JOIN aset ON kerusakan.nama_aset = aset.nama_aset
     $whereClause
@@ -200,7 +208,13 @@ $query = mysqli_query($koneksi, "
 
     <div id="wrapper">
 
-        <?php include(__DIR__ . '/../sidebar.php'); ?>
+        <?php
+        if (isset($_SESSION['level']) && $_SESSION['level'] == 'teknisi') {
+            include(__DIR__ . '/sidebar_teknisi.php');
+        } else {
+            include(__DIR__ . '/../sidebar.php');
+        }
+        ?>
 
         <div id="page-content-wrapper">
 
@@ -223,7 +237,7 @@ $query = mysqli_query($koneksi, "
 
                         <div>
                             <i class="bi bi-table"></i>
-                            Daftar Pelaporan Kerusakan
+                            Daftar Pelaporan Kerusakan <?= ($_SESSION['level'] == 'teknisi') ? '(Tugas Anda)' : '' ?>
                         </div>
 
                         <div class="d-flex gap-2">
@@ -244,9 +258,11 @@ $query = mysqli_query($koneksi, "
 
                             </form>
 
-                            <a href="kerusakan_tambah.php" class="btn btn-light btn-sm">
-                                <i class="bi bi-plus-lg"></i> Tambah
-                            </a>
+                            <?php if ($_SESSION['level'] != 'teknisi'): ?>
+                                <a href="kerusakan_tambah.php" class="btn btn-light btn-sm">
+                                    <i class="bi bi-plus-lg"></i> Tambah
+                                </a>
+                            <?php endif; ?>
 
                             <a href="kerusakan_cetak.php?kategori=<?= urlencode($kategori_filter) ?>&search=<?= urlencode($search) ?>"
                                 target="_blank"
@@ -263,14 +279,14 @@ $query = mysqli_query($koneksi, "
                         <li class="nav-item">
                             <a class="nav-link <?= ($kategori_filter == 'medis') ? 'active-medis' : '' ?>"
                                 href="?kategori=medis">
-                                🏥 Aset Medis
+                                💼 Aset Medis
                             </a>
                         </li>
 
                         <li class="nav-item">
                             <a class="nav-link <?= ($kategori_filter == 'non-medis') ? 'active-nonmedis' : '' ?>"
                                 href="?kategori=non-medis">
-                                🪑 Aset Non-Medis
+                                🖥️ Aset Non-Medis
                             </a>
                         </li>
 
@@ -292,14 +308,14 @@ $query = mysqli_query($koneksi, "
                                 <thead>
                                     <tr>
                                         <th>No</th>
-                                        <th>Nama Aset</th>
+                                        <th>Nama Aset & Info Stok</th>
                                         <th>Lokasi Ruangan</th>
                                         <th>Kategori</th>
                                         <th>Pelapor</th>
                                         <th>Tanggal Lapor</th>
                                         <th>Rincian Kerusakan</th>
                                         <th>Teknisi</th>
-                                        <th>Status</th>
+                                        <th>Status Laporan</th>
                                         <th>Aksi</th>
                                     </tr>
                                 </thead>
@@ -310,7 +326,7 @@ $query = mysqli_query($koneksi, "
 
                                         <tr>
                                             <td colspan="10" class="text-center py-5">
-                                                Tidak ada data kerusakan.
+                                                Tidak ada data laporan kerusakan.
                                             </td>
                                         </tr>
 
@@ -324,8 +340,18 @@ $query = mysqli_query($koneksi, "
 
                                                 <td><?= $no++ ?></td>
 
-                                                <td class="text-start fw-bold">
-                                                    <?= htmlspecialchars($row['nama_aset']) ?>
+                                                <td class="text-start">
+                                                    <span class="fw-bold d-block mb-1 text-dark">
+                                                        <?= htmlspecialchars($row['nama_aset']) ?>
+                                                    </span>
+                                                    <div class="d-flex gap-1" style="font-size: 0.75rem;">
+                                                        <span class="badge bg-danger rounded-pill fw-normal" title="Total stok yang tercatat rusak">
+                                                            Rusak: <?= isset($row['stok_rusak']) ? htmlspecialchars($row['stok_rusak']) : '0' ?>
+                                                        </span>
+                                                        <span class="badge bg-success rounded-pill fw-normal" title="Sisa stok yang masih bisa dipakai/dipinjam">
+                                                            Tersedia: <?= isset($row['stok_tersedia']) ? htmlspecialchars($row['stok_tersedia']) : '0' ?>
+                                                        </span>
+                                                    </div>
                                                 </td>
 
                                                 <td class="text-start">
@@ -336,13 +362,9 @@ $query = mysqli_query($koneksi, "
                                                 <td>
 
                                                     <?php if (($row['kategori_aset'] ?? '') == 'Medis'): ?>
-
                                                         <span class="badge-medis">Medis</span>
-
                                                     <?php else: ?>
-
                                                         <span class="badge-nonmedis">Non-Medis</span>
-
                                                     <?php endif; ?>
 
                                                 </td>
@@ -370,19 +392,20 @@ $query = mysqli_query($koneksi, "
 
                                                     <?php
                                                     $status = $row['status'] ?? 'Baru';
+                                                    $bg = 'bg-secondary';
 
-                                                    $bg = 'bg-danger';
-
-                                                    if ($status == 'Diproses') {
+                                                    if ($status == 'Rusak') {
+                                                        $bg = 'bg-danger';
+                                                    } elseif ($status == 'Perlu Perawatan') {
                                                         $bg = 'bg-warning text-dark';
-                                                    }
-
-                                                    if ($status == 'Selesai') {
+                                                    } elseif ($status == 'Dalam Perbaikan' || $status == 'Diproses') {
+                                                        $bg = 'bg-info text-dark';
+                                                    } elseif ($status == 'Selesai Diperbaiki' || $status == 'Selesai') {
                                                         $bg = 'bg-success';
                                                     }
                                                     ?>
 
-                                                    <span class="badge <?= $bg ?>">
+                                                    <span class="badge <?= $bg ?> shadow-sm px-3 py-2">
                                                         <?= htmlspecialchars($status) ?>
                                                     </span>
 
@@ -393,19 +416,17 @@ $query = mysqli_query($koneksi, "
                                                     <div class="d-flex gap-1 justify-content-center">
 
                                                         <a href="kerusakan_edit.php?id=<?= $row['id'] ?>"
-                                                            class="btn btn-warning btn-sm text-white">
-
-                                                            <i class="bi bi-pencil-square"></i>
-
+                                                            class="btn btn-warning btn-sm text-white" title="Edit Laporan / Update Status">
+                                                            <i class="bi bi-pencil-square"></i> <?= ($_SESSION['level'] == 'teknisi') ? 'Update' : '' ?>
                                                         </a>
 
-                                                        <a href="kerusakan_hapus.php?id=<?= $row['id'] ?>"
-                                                            class="btn btn-danger btn-sm"
-                                                            onclick="return confirm('Hapus data?')">
-
-                                                            <i class="bi bi-trash"></i>
-
-                                                        </a>
+                                                        <?php if ($_SESSION['level'] != 'teknisi'): ?>
+                                                            <a href="kerusakan_hapus.php?id=<?= $row['id'] ?>"
+                                                                class="btn btn-danger btn-sm"
+                                                                onclick="return confirm('Hapus data laporan ini?')" title="Hapus Laporan">
+                                                                <i class="bi bi-trash"></i>
+                                                            </a>
+                                                        <?php endif; ?>
 
                                                     </div>
 
@@ -421,6 +442,28 @@ $query = mysqli_query($koneksi, "
 
                             </table>
 
+                        </div>
+
+                        <div class="card-footer bg-white d-flex justify-content-end py-3 border-top-0">
+                            <nav>
+                                <ul class="pagination pagination-sm mb-0">
+                                    <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
+                                        <a class="page-link" style="border-radius: 6px 0 0 6px;"
+                                            href="?page=<?= $page - 1 ?>&kategori=<?= urlencode($kategori_filter) ?>&search=<?= urlencode($search) ?>">
+                                            Prev
+                                        </a>
+                                    </li>
+                                    <li class="page-item disabled">
+                                        <span class="page-link bg-light text-dark fw-bold"><?= $page ?> / <?= max(1, $total_page) ?></span>
+                                    </li>
+                                    <li class="page-item <?= ($page >= $total_page) ? 'disabled' : '' ?>">
+                                        <a class="page-link" style="border-radius: 0 6px 6px 0;
+" href="?page=<?= $page + 1 ?>&kategori=<?= urlencode($kategori_filter) ?>&search=<?= urlencode($search) ?>">
+                                            Next
+                                        </a>
+                                    </li>
+                                </ul>
+                            </nav>
                         </div>
 
                     </div>

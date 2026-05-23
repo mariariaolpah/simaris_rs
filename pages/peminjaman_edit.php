@@ -10,23 +10,33 @@ include(__DIR__ . '/../config/koneksi.php');
 $id = intval($_GET['id']);
 $data = mysqli_query($koneksi, "SELECT * FROM peminjaman WHERE id_pinjam = $id");
 $row = mysqli_fetch_assoc($data);
+$id_aset_lama = $row['id_aset']; // Simpan id alat yang lama
+$status_saat_ini = $row['status_pinjam'];
 
-// Mengambil daftar aset yang baik, ATAU tetap memunculkan aset ini sendiri jika kondisinya sudah berubah
-$aset_query = mysqli_query($koneksi, "SELECT * FROM aset WHERE kondisi = 'Baik' OR id_aset = " . intval($row['id_aset']) . " ORDER BY nama_aset ASC");
+// Mengambil daftar aset untuk pilihan dropdown (Tampilkan yang stoknya > 0 ATAU aset yang saat ini sedang dipinjam)
+$aset_query = mysqli_query($koneksi, "SELECT * FROM aset WHERE stok_tersedia > 0 OR id_aset = '$id_aset_lama' ORDER BY nama_aset ASC");
 
-// Ambil master data ruangan dari tabel lokasi_aset agar match 100%
+// Ambil master data ruangan
 $q_lokasi = mysqli_query($koneksi, "SELECT * FROM lokasi_aset ORDER BY nama_lokasi ASC");
 
 if (isset($_POST['update'])) {
-    $id_aset = $_POST['id_aset'];
+    $id_aset_baru = $_POST['id_aset'];
     $nama_peminjam = mysqli_real_escape_string($koneksi, $_POST['nama_peminjam']);
     $lokasi_tujuan = mysqli_real_escape_string($koneksi, $_POST['lokasi_tujuan']);
     $tgl_pinjam = $_POST['tanggal_pinjam'];
     $estimasi_kembali = $_POST['estimasi_kembali'];
 
-    // QUERY UPDATE SUDAH DISESUAIKAN DENGAN STRUKTUR DATA TERBARU
+    // [VALIDASI STOK] Jika aset diubah, cek apakah aset baru ada stoknya
+    if ($id_aset_lama != $id_aset_baru && $status_saat_ini == 'Dipinjam') {
+        $cek_stok = mysqli_fetch_assoc(mysqli_query($koneksi, "SELECT stok_tersedia FROM aset WHERE id_aset = '$id_aset_baru'"));
+        if ($cek_stok['stok_tersedia'] <= 0) {
+            echo "<script>alert('GAGAL: Alat pengganti yang Anda pilih stoknya sedang kosong!');window.history.back();</script>";
+            exit;
+        }
+    }
+
     $update = mysqli_query($koneksi, "UPDATE peminjaman SET 
-                            id_aset = '$id_aset', 
+                            id_aset = '$id_aset_baru', 
                             nama_peminjam = '$nama_peminjam', 
                             lokasi_tujuan = '$lokasi_tujuan', 
                             tanggal_pinjam = '$tgl_pinjam', 
@@ -34,6 +44,14 @@ if (isset($_POST['update'])) {
                             WHERE id_pinjam = $id");
 
     if ($update) {
+        // [MODIFIKASI] SINKRONISASI STOK JIKA ASET DITUKAR
+        if ($id_aset_lama != $id_aset_baru && $status_saat_ini == 'Dipinjam') {
+            // Kembalikan stok alat yang lama
+            mysqli_query($koneksi, "UPDATE aset SET stok_tersedia = stok_tersedia + 1 WHERE id_aset = '$id_aset_lama'");
+            // Kurangi stok alat yang baru
+            mysqli_query($koneksi, "UPDATE aset SET stok_tersedia = stok_tersedia - 1 WHERE id_aset = '$id_aset_baru'");
+        }
+
         echo "<script>alert('Data peminjaman berhasil diperbarui!');window.location='peminjaman.php';</script>";
     } else {
         echo "<script>alert('Gagal memperbarui data peminjaman!');</script>";
@@ -49,7 +67,6 @@ if (isset($_POST['update'])) {
     <title>Edit Peminjaman | SIMARIS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-
     <style>
         body {
             background-color: #f4f6f9;
@@ -95,8 +112,7 @@ if (isset($_POST['update'])) {
             font-weight: 600;
             font-size: 1.1rem;
             padding: 15px 20px;
-            border-top-left-radius: 12px !important;
-            border-top-right-radius: 12px !important;
+            border-radius: 12px 12px 0 0;
             display: flex;
             align-items: center;
             gap: 10px;
@@ -114,12 +130,6 @@ if (isset($_POST['update'])) {
             border: 1px solid #cbd5e1;
         }
 
-        .form-control:focus,
-        .form-select:focus {
-            border-color: #2c7a7b;
-            box-shadow: 0 0 0 0.2rem rgba(44, 122, 123, 0.25);
-        }
-
         .highlight-box {
             background-color: #f0f9ff;
             border-left: 4px solid #0284c7;
@@ -133,56 +143,42 @@ if (isset($_POST['update'])) {
 <body>
     <div id="wrapper">
         <?php include(__DIR__ . '/../sidebar.php'); ?>
-
         <div id="page-content-wrapper">
             <div class="dashboard-header">
                 <h4 class="fw-bold m-0"><i class="bi bi-pencil-square"></i> EDIT DATA PEMINJAMAN</h4>
                 <div class="small fw-medium">
                     <i class="bi bi-person-circle-fill"></i> <?= htmlspecialchars($_SESSION['nama_pengguna']); ?>
-                    <span class="badge bg-light text-dark ms-1" style="text-transform: uppercase;"><?= htmlspecialchars($_SESSION['level']); ?></span>
                 </div>
             </div>
-
             <div class="content">
                 <div class="card" style="max-width: 750px; margin: 0 auto;">
-                    <div class="card-header">
-                        <i class="bi bi-clipboard-check-fill"></i>
-                        <span>Form Ubah Catatan Pergerakan Aset</span>
-                    </div>
-
+                    <div class="card-header"><i class="bi bi-clipboard-check-fill"></i><span>Form Ubah Catatan Pergerakan Aset</span></div>
                     <div class="card-body p-4">
                         <form method="POST">
-
                             <div class="mb-4">
                                 <label class="form-label">Pilih Alat / Aset Rumah Sakit</label>
                                 <select name="id_aset" class="form-select" required>
-                                    <option value="">-- Pilih Alat Kesehatan / Inventaris --</option>
                                     <?php while ($a = mysqli_fetch_assoc($aset_query)) : ?>
                                         <option value="<?= $a['id_aset'] ?>" <?= $a['id_aset'] == $row['id_aset'] ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($a['nama_aset']) ?> — (📍 Asal: <?= htmlspecialchars($a['lokasi']) ?>)
+                                            <?= htmlspecialchars($a['nama_aset']) ?> — [ TERSISA: <?= $a['stok_tersedia'] ?> | 📍 <?= htmlspecialchars($a['lokasi']) ?> ]
                                         </option>
                                     <?php endwhile; ?>
                                 </select>
                             </div>
-
                             <div class="mb-4">
                                 <label class="form-label">Nama Peminjam / Penanggung Jawab</label>
                                 <input type="text" name="nama_peminjam" class="form-control" value="<?= htmlspecialchars($row['nama_peminjam']) ?>" required>
                             </div>
-
                             <div class="highlight-box">
-                                <label class="form-label text-primary"><i class="bi bi-hospital"></i> Alat Akan Dibawa Ke Ruangan Mana?</label>
+                                <label class="form-label text-primary"><i class="bi bi-hospital"></i> Alat Dibawa Ke Ruangan Mana?</label>
                                 <select name="lokasi_tujuan" class="form-select border-primary mb-1" required>
-                                    <option value="">-- Pilih Ruangan Tujuan --</option>
                                     <?php while ($lok = mysqli_fetch_assoc($q_lokasi)): ?>
                                         <option value="<?= htmlspecialchars($lok['nama_lokasi']) ?>" <?= $lok['nama_lokasi'] == $row['lokasi_tujuan'] ? 'selected' : '' ?>>
                                             <?= htmlspecialchars($lok['nama_lokasi']) ?>
                                         </option>
                                     <?php endwhile; ?>
                                 </select>
-                                <small class="text-secondary">Daftar ruangan otomatis sinkron & tetap mengunci data lama yang telah dipilih.</small>
                             </div>
-
                             <div class="row">
                                 <div class="col-md-6 mb-4">
                                     <label class="form-label">Tanggal Mulai Pinjam</label>
@@ -193,22 +189,11 @@ if (isset($_POST['update'])) {
                                     <input type="date" name="estimasi_kembali" class="form-control" value="<?= $row['estimasi_kembali'] ?>" required>
                                 </div>
                             </div>
-
                             <hr>
-
                             <div class="row g-2 mt-2">
-                                <div class="col-sm-8">
-                                    <button type="submit" name="update" class="btn btn-success w-100 py-2 fw-bold" style="border-radius: 8px;">
-                                        <i class="bi bi-save-fill"></i> Perbarui Data Peminjaman
-                                    </button>
-                                </div>
-                                <div class="col-sm-4">
-                                    <a href="peminjaman.php" class="btn btn-secondary w-100 py-2" style="border-radius: 8px;">
-                                        Batal Kembali
-                                    </a>
-                                </div>
+                                <div class="col-sm-8"><button type="submit" name="update" class="btn btn-success w-100 py-2 fw-bold" style="border-radius: 8px;"><i class="bi bi-save-fill"></i> Perbarui Data Peminjaman</button></div>
+                                <div class="col-sm-4"><a href="peminjaman.php" class="btn btn-secondary w-100 py-2" style="border-radius: 8px;">Batal Kembali</a></div>
                             </div>
-
                         </form>
                     </div>
                 </div>

@@ -10,9 +10,6 @@ ob_start();
 require(__DIR__ . '/../config/fpdf.php');
 include(__DIR__ . '/../config/koneksi.php');
 
-// =======================
-// FILTER PENCARIAN SINKRON
-// =======================
 $search         = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
 $kategoriFilter = isset($_GET['kategori']) ? mysqli_real_escape_string($koneksi, $_GET['kategori']) : '';
 $dari           = isset($_GET['dari']) ? mysqli_real_escape_string($koneksi, $_GET['dari']) : '';
@@ -26,23 +23,14 @@ if ($sampai != '') $where[] = "tanggal_masuk <= '$sampai'";
 
 $whereSQL = 'WHERE ' . implode(' AND ', $where);
 
-// =======================
-// QUERY DATA
-// =======================
 $sql = "SELECT * FROM aset $whereSQL ORDER BY tanggal_masuk DESC";
 $result = mysqli_query($koneksi, $sql);
 
-// =======================
-// INISIALISASI PDF
-// =======================
 $pdf = new FPDF('L', 'mm', 'A4');
 $pdf->AddPage();
 $pdf->SetMargins(10, 10, 10);
 $pdf->SetAutoPageBreak(false);
 
-// =======================
-// KOP SURAT
-// =======================
 $y = 8;
 $logoLeft  = realpath(__DIR__ . '/../assets/img/logo_dokpol.png');
 $logoRight = realpath(__DIR__ . '/../assets/img/logo_rs.jpg');
@@ -57,9 +45,6 @@ $pdf->SetFont('Arial', '', 11);
 $pdf->Cell(0, 6, 'Jl. A. Yani Km. 3,5 Banjarmasin 70235', 0, 1, 'C');
 $pdf->Ln(8);
 
-// =======================
-// JUDUL LAPORAN
-// =======================
 $pdf->SetFont('Arial', 'B', 14);
 $pdf->Cell(0, 10, 'LAPORAN REKAPITULASI NILAI DEPRESIASI ASET', 0, 1, 'C');
 
@@ -73,12 +58,10 @@ if (count($subHeader) > 0) {
 }
 $pdf->Ln(4);
 
-// =======================
-// HEADER TABEL (8 Kolom, Sesuai Web)
-// =======================
-// Total Lebar: 10+60+25+22+20+45+40+55 = 277 mm
-$w = [10, 60, 25, 22, 20, 45, 40, 55];
-$header = ['No', 'Nama Aset', 'Kategori', 'Thn Masuk', 'Umur Eko.', 'Harga Beli Awal', 'Susut / Tahun', 'Nilai Saat Ini'];
+/* ================= UKURAN TABEL BARU ================= */
+// Total Lebar: 277 mm
+$w = [10, 55, 25, 22, 15, 15, 40, 40, 55];
+$header = ['No', 'Nama Aset', 'Kategori', 'Thn Masuk', 'Umur', 'Stok', 'Harga Total Awal', 'Susut / Tahun', 'Nilai Saat Ini'];
 
 function cetakHeaderNilai($pdf, $w, $header)
 {
@@ -95,9 +78,6 @@ function cetakHeaderNilai($pdf, $w, $header)
 
 cetakHeaderNilai($pdf, $w, $header);
 
-// =======================
-// ISI TABEL & PERHITUNGAN LOGIKA PDF
-// =======================
 $no = 1;
 $total_harga_awal = 0;
 $total_nilai_saat_ini = 0;
@@ -108,33 +88,32 @@ if (mysqli_num_rows($result) > 0) {
 
         $nama_aset = $row['nama_aset'];
         $kategori  = $row['kategori_aset'] ?? '-';
-        $harga     = $row['harga'];
+        $stok      = (int)($row['stok'] ?? 1);
+        $harga_total = $row['harga'] * $stok; // Hitung berdasarkan stok
+
         $umur      = isset($row['umur_ekonomis']) ? (int)$row['umur_ekonomis'] : 0;
         $tgl_masuk = $row['tanggal_masuk'];
         $thn_masuk = date('Y', strtotime($tgl_masuk));
 
-        // LOGIKA PENYUSUTAN
+        // LOGIKA PENYUSUTAN TOTAL
         $susut_per_tahun = 0;
-        $nilai_sekarang = $harga;
+        $nilai_sekarang = $harga_total;
 
         if ($umur > 0) {
-            $susut_per_tahun = $harga / $umur;
+            $susut_per_tahun = $harga_total / $umur;
             $pakai = $tahun_sekarang - $thn_masuk;
             if ($pakai < 0) $pakai = 0;
             if ($pakai > $umur) $pakai = $umur;
 
             $akumulasi = $pakai * $susut_per_tahun;
-            $nilai_sekarang = $harga - $akumulasi;
+            $nilai_sekarang = $harga_total - $akumulasi;
         }
 
-        // Akumulasi Total Keseluruhan
-        $total_harga_awal += $harga;
+        $total_harga_awal += $harga_total;
         $total_nilai_saat_ini += $nilai_sekarang;
 
-        // Membatasi teks agar rapi
-        if (strlen($nama_aset) > 30) $nama_aset = substr($nama_aset, 0, 27) . '...';
+        if (strlen($nama_aset) > 28) $nama_aset = substr($nama_aset, 0, 25) . '...';
 
-        // Pindah halaman jika tabel mentok bawah
         if ($pdf->GetY() > 180) {
             $pdf->AddPage();
             cetakHeaderNilai($pdf, $w, $header);
@@ -145,12 +124,13 @@ if (mysqli_num_rows($result) > 0) {
         $pdf->Cell($w[2], 8, $kategori, 1, 0, 'C');
         $pdf->Cell($w[3], 8, $thn_masuk, 1, 0, 'C');
         $pdf->Cell($w[4], 8, ($umur > 0 ? $umur . " Thn" : "-"), 1, 0, 'C');
-        $pdf->Cell($w[5], 8, 'Rp ' . number_format($harga, 0, ',', '.'), 1, 0, 'R');
-        $pdf->SetTextColor(220, 53, 69); // Warna merah untuk susut
-        $pdf->Cell($w[6], 8, '- Rp ' . number_format($susut_per_tahun, 0, ',', '.'), 1, 0, 'R');
-        $pdf->SetTextColor(0); // Kembali ke hitam
+        $pdf->Cell($w[5], 8, $stok, 1, 0, 'C');
+        $pdf->Cell($w[6], 8, 'Rp ' . number_format($harga_total, 0, ',', '.'), 1, 0, 'R');
+        $pdf->SetTextColor(220, 53, 69);
+        $pdf->Cell($w[7], 8, '- Rp ' . number_format($susut_per_tahun, 0, ',', '.'), 1, 0, 'R');
+        $pdf->SetTextColor(0);
         $pdf->SetFont('Arial', 'B', 8);
-        $pdf->Cell($w[7], 8, 'Rp ' . number_format($nilai_sekarang, 0, ',', '.'), 1, 1, 'R');
+        $pdf->Cell($w[8], 8, 'Rp ' . number_format($nilai_sekarang, 0, ',', '.'), 1, 1, 'R');
         $pdf->SetFont('Arial', '', 8);
     }
 } else {
@@ -158,22 +138,16 @@ if (mysqli_num_rows($result) > 0) {
     $pdf->Cell(array_sum($w), 10, 'Tidak ada data aset ternilai.', 1, 1, 'C');
 }
 
-// =======================
-// BARIS TOTAL AKUMULASI (FOOTER TABEL)
-// =======================
 $pdf->SetFont('Arial', 'B', 9);
 $pdf->SetFillColor(240, 240, 240);
 
-$pdf->Cell($w[0] + $w[1] + $w[2] + $w[3] + $w[4], 10, 'TOTAL KESELURUHAN NILAI INVESTASI ASET', 1, 0, 'R', true);
-$pdf->Cell($w[5], 10, 'Rp ' . number_format($total_harga_awal, 0, ',', '.'), 1, 0, 'R', true);
-$pdf->Cell($w[6], 10, '', 1, 0, 'C', true); // Kosongkan kolom susut total agar tidak rancu
-$pdf->SetTextColor(25, 135, 84); // Hijau untuk total akhir
-$pdf->Cell($w[7], 10, 'Rp ' . number_format($total_nilai_saat_ini, 0, ',', '.'), 1, 1, 'R', true);
+$pdf->Cell($w[0] + $w[1] + $w[2] + $w[3] + $w[4] + $w[5], 10, 'TOTAL KESELURUHAN NILAI INVESTASI ASET', 1, 0, 'R', true);
+$pdf->Cell($w[6], 10, 'Rp ' . number_format($total_harga_awal, 0, ',', '.'), 1, 0, 'R', true);
+$pdf->Cell($w[7], 10, '', 1, 0, 'C', true);
+$pdf->SetTextColor(25, 135, 84);
+$pdf->Cell($w[8], 10, 'Rp ' . number_format($total_nilai_saat_ini, 0, ',', '.'), 1, 1, 'R', true);
 $pdf->SetTextColor(0);
 
-// =======================
-// AREA TANDA TANGAN
-// =======================
 if ($pdf->GetY() > 155) {
     $pdf->AddPage();
 }

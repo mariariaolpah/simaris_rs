@@ -28,10 +28,11 @@ $kategori_filter = isset($_GET['kategori']) ? $_GET['kategori'] : 'semua';
 
 $whereConditions = [];
 
-// Jika ada pencarian
+// Jika ada pencarian (Ditambahkan pencarian untuk petugas_kalibrasi)
 if ($search != '') {
     $whereConditions[] = "(p.nama_aset LIKE '%$search%' 
         OR p.teknisi LIKE '%$search%' 
+        OR p.petugas_kalibrasi LIKE '%$search%' 
         OR p.status LIKE '%$search%'
         OR a.lokasi LIKE '%$search%'
         OR a.kategori_aset LIKE '%$search%')";
@@ -128,7 +129,6 @@ $query = mysqli_query($koneksi, "
             padding: 15px 20px;
         }
 
-        /* --- CSS TABS SEPERTI MENU KERUSAKAN --- */
         .nav-tabs {
             border-bottom: 2px solid #e2e8f0;
             margin-top: 15px;
@@ -267,7 +267,8 @@ $query = mysqli_query($koneksi, "
                                     <th>Nama Aset</th>
                                     <th>Lokasi Ruangan</th>
                                     <th>Kategori</th>
-                                    <th>Teknisi</th>
+                                    <th>Teknisi Perawatan</th>
+                                    <th>Petugas Kalibrasi</th>
                                     <th>Tgl Perawatan</th>
                                     <th>Jadwal Kalibrasi Berikutnya</th>
                                     <th>Status</th>
@@ -279,7 +280,7 @@ $query = mysqli_query($koneksi, "
 
                                 <?php if (mysqli_num_rows($query) == 0): ?>
                                     <tr>
-                                        <td colspan="9" class="py-5 text-center text-muted">
+                                        <td colspan="10" class="py-5 text-center text-muted">
                                             Tidak ada jadwal perawatan / kalibrasi di kategori ini.
                                         </td>
                                     </tr>
@@ -307,7 +308,8 @@ $query = mysqli_query($koneksi, "
                                                 <?php endif; ?>
                                             </td>
 
-                                            <td><?= htmlspecialchars($p['teknisi']) ?></td>
+                                            <td><?= htmlspecialchars($p['teknisi'] ?? '-') ?></td>
+                                            <td><?= htmlspecialchars($p['petugas_kalibrasi'] ?? '-') ?></td>
                                             <td><?= formatTanggal($p['tanggal']) ?></td>
 
                                             <td>

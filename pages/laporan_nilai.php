@@ -48,13 +48,12 @@ include(__DIR__ . '/../header.php');
     $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
     $perPage = 10;
 
-    // SINKRONISASI FILTER PENCARIAN
     $search = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
     $kategoriFilter = isset($_GET['kategori']) ? mysqli_real_escape_string($koneksi, $_GET['kategori']) : '';
     $dari = isset($_GET['dari']) ? mysqli_real_escape_string($koneksi, $_GET['dari']) : '';
     $sampai = isset($_GET['sampai']) ? mysqli_real_escape_string($koneksi, $_GET['sampai']) : '';
 
-    $where = ["harga > 0"]; // Hanya aset yang memiliki harga
+    $where = ["harga > 0"];
     if ($search != '') $where[] = "(nama_aset LIKE '%$search%' OR asal_usul LIKE '%$search%')";
     if ($kategoriFilter != '') $where[] = "kategori_aset = '$kategoriFilter'";
     if ($dari != '') $where[] = "tanggal_masuk >= '$dari'";
@@ -63,24 +62,27 @@ include(__DIR__ . '/../header.php');
     $whereSQL = 'WHERE ' . implode(' AND ', $where);
 
     // =========================================================
-    // MENGHITUNG STATISTIK TOTAL DENGAN RUMUS DEPRESIASI
+    // MENGHITUNG STATISTIK TOTAL DENGAN RUMUS DEPRESIASI (DIKALIKAN STOK)
     // =========================================================
-    $statSumQ = mysqli_query($koneksi, "SELECT harga, tanggal_masuk, umur_ekonomis FROM aset $whereSQL");
-    $total_aset = 0;
+    $statSumQ = mysqli_query($koneksi, "SELECT harga, stok, tanggal_masuk, umur_ekonomis FROM aset $whereSQL");
+    $total_jenis_aset = 0;
+    $total_unit_aset = 0;
     $total_harga_awal = 0;
     $total_nilai_saat_ini = 0;
 
     $tahun_sekarang = date('Y');
 
     while ($rowStat = mysqli_fetch_assoc($statSumQ)) {
-        $total_aset++;
-        $harga_awal = $rowStat['harga'];
+        $total_jenis_aset++;
+        $stok = (int)($rowStat['stok'] ?? 1);
+        $total_unit_aset += $stok;
+
+        $harga_awal = $rowStat['harga'] * $stok; // Harga total berdasarkan stok
         $umur_eko = isset($rowStat['umur_ekonomis']) ? (int)$rowStat['umur_ekonomis'] : 0;
         $tahun_masuk = date('Y', strtotime($rowStat['tanggal_masuk']));
 
         $total_harga_awal += $harga_awal;
 
-        // Logika Depresiasi
         $nilai_buku = $harga_awal;
         if ($umur_eko > 0) {
             $selisih_tahun = $tahun_sekarang - $tahun_masuk;
@@ -104,13 +106,11 @@ include(__DIR__ . '/../header.php');
     <div class="d-flex justify-content-between align-items-center mb-3 mt-3">
         <form class="d-flex gap-2 filter-form" method="GET">
             <input type="text" name="search" placeholder="Cari aset/asal usul..." value="<?= htmlspecialchars($search) ?>">
-
             <select name="kategori">
                 <option value="">Semua Kategori</option>
                 <option value="Medis" <?= $kategoriFilter == 'Medis' ? 'selected' : '' ?>>Medis</option>
                 <option value="Non-Medis" <?= $kategoriFilter == 'Non-Medis' ? 'selected' : '' ?>>Non-Medis</option>
             </select>
-
             <input type="date" name="dari" value="<?= htmlspecialchars($dari) ?>">
             <input type="date" name="sampai" value="<?= htmlspecialchars($sampai) ?>">
             <button class="btn btn-success btn-sm" type="submit">🔍 Filter</button>
@@ -121,8 +121,8 @@ include(__DIR__ . '/../header.php');
 
     <div class="stats">
         <div class="stat border-start border-primary border-4">
-            <small class="text-muted d-block">Jumlah Aset Ternilai</small>
-            <span class="fs-5 fw-bold"><?= $total_aset ?> Unit</span>
+            <small class="text-muted d-block">Jumlah Aset (Berdasarkan Unit)</small>
+            <span class="fs-5 fw-bold"><?= $total_unit_aset ?> Unit (Dari <?= $total_jenis_aset ?> Jenis)</span>
         </div>
         <div class="stat border-start border-warning border-4">
             <small class="text-muted d-block">Total Nilai Investasi (Awal)</small>
@@ -135,7 +135,7 @@ include(__DIR__ . '/../header.php');
     </div>
 
     <div class="card shadow-sm mt-3">
-        <div class="card-header">Rincian Penyusutan Nilai Aset (Garis Lurus)</div>
+        <div class="card-header">Rincian Penyusutan Nilai Aset (Harga x Stok)</div>
         <div class="card-body p-0 table-responsive">
             <table class="table table-bordered table-hover text-center mb-0 align-middle">
                 <thead class="table-light">
@@ -144,11 +144,12 @@ include(__DIR__ . '/../header.php');
                         <th rowspan="2" class="align-middle text-start">Nama Aset</th>
                         <th rowspan="2" class="align-middle">Kategori</th>
                         <th rowspan="2" class="align-middle">Tahun Masuk</th>
-                        <th rowspan="2" class="align-middle">Umur Eko.</th>
-                        <th colspan="3">Data Keuangan & Depresiasi</th>
+                        <th rowspan="2" class="align-middle">Umur</th>
+                        <th rowspan="2" class="align-middle">Stok</th>
+                        <th colspan="3">Data Keuangan & Depresiasi Total</th>
                     </tr>
                     <tr>
-                        <th>Harga Beli Awal</th>
+                        <th>Harga Beli (Total)</th>
                         <th>Susut / Tahun</th>
                         <th>Nilai Buku (Saat Ini)</th>
                     </tr>
@@ -157,28 +158,30 @@ include(__DIR__ . '/../header.php');
                     <?php
                     $no = $offset + 1;
                     if (mysqli_num_rows($dataQ) == 0) {
-                        echo "<tr><td colspan='8' class='py-4'>Data aset dengan nilai tidak ditemukan</td></tr>";
+                        echo "<tr><td colspan='9' class='py-4'>Data aset dengan nilai tidak ditemukan</td></tr>";
                     }
 
                     while ($r = mysqli_fetch_assoc($dataQ)) {
-                        $harga = $r['harga'];
+                        $stok = (int)($r['stok'] ?? 1);
+                        $harga_total = $r['harga'] * $stok;
+
                         $umur = isset($r['umur_ekonomis']) ? (int)$r['umur_ekonomis'] : 0;
                         $tgl_masuk = $r['tanggal_masuk'];
                         $thn_masuk = date('Y', strtotime($tgl_masuk));
                         $kategori = isset($r['kategori_aset']) ? $r['kategori_aset'] : '-';
 
                         $susut_per_tahun = 0;
-                        $nilai_sekarang = $harga;
+                        $nilai_sekarang = $harga_total;
 
                         if ($umur > 0) {
-                            $susut_per_tahun = $harga / $umur;
+                            $susut_per_tahun = $harga_total / $umur;
 
                             $pakai = $tahun_sekarang - $thn_masuk;
                             if ($pakai < 0) $pakai = 0;
                             if ($pakai > $umur) $pakai = $umur;
 
                             $akumulasi = $pakai * $susut_per_tahun;
-                            $nilai_sekarang = $harga - $akumulasi;
+                            $nilai_sekarang = $harga_total - $akumulasi;
                         }
 
                         $badge = ($kategori == 'Medis') ? '<span class="badge bg-danger">Medis</span>' : '<span class="badge bg-primary">Non-Medis</span>';
@@ -190,7 +193,8 @@ include(__DIR__ . '/../header.php');
                             <td>$badge</td>
                             <td>$thn_masuk</td>
                             <td>" . ($umur > 0 ? "$umur Thn" : "-") . "</td>
-                            <td class='text-end'>Rp " . number_format($harga, 0, ',', '.') . "</td>
+                            <td class='fw-bold text-primary'>$stok</td>
+                            <td class='text-end'>Rp " . number_format($harga_total, 0, ',', '.') . "</td>
                             <td class='text-end text-danger'>- Rp " . number_format($susut_per_tahun, 0, ',', '.') . "</td>
                             <td class='text-end fw-bold text-success'>Rp " . number_format($nilai_sekarang, 0, ',', '.') . "</td>
                         </tr>";

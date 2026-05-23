@@ -36,17 +36,19 @@ if (isset($_POST['simpan'])) {
     $insert = mysqli_query($koneksi, "INSERT INTO kerusakan (nama_aset, status, tanggal, keterangan, pelapor, teknisi) 
                             VALUES ('$nama_aset','$status','$tanggal','$keterangan', '$pelapor', '$teknisi')");
 
-    // Mengupdate langsung kondisi fisik aset utama di master data
+    // [MODIFIKASI] Mengupdate rincian stok ketersediaan di master data secara otomatis
     if ($insert) {
         if ($status == "Rusak") {
-            mysqli_query($koneksi, "UPDATE aset SET kondisi = 'Rusak' WHERE id_aset = $id_aset");
+            // Kurangi stok tersedia, dan tambah 1 ke stok rusak
+            mysqli_query($koneksi, "UPDATE aset SET stok_tersedia = stok_tersedia - 1, stok_rusak = stok_rusak + 1 WHERE id_aset = $id_aset");
         } elseif ($status == "Perlu Perawatan" || $status == "Dalam Perbaikan") {
-            mysqli_query($koneksi, "UPDATE aset SET kondisi = 'Perlu Perawatan' WHERE id_aset = $id_aset");
-        } elseif ($status == "Selesai Diperbaiki") {
-            mysqli_query($koneksi, "UPDATE aset SET kondisi = 'Baik' WHERE id_aset = $id_aset");
+            // Kurangi stok tersedia, dan tambah 1 ke stok perawatan
+            mysqli_query($koneksi, "UPDATE aset SET stok_tersedia = stok_tersedia - 1, stok_perawatan = stok_perawatan + 1 WHERE id_aset = $id_aset");
         }
 
-        echo "<script>alert('Laporan kerusakan aset berhasil dicatat!');window.location='kerusakan.php';</script>";
+        // Jika statusnya langsung "Selesai Diperbaiki" (walau jarang di awal), stok dibiarkan utuh
+
+        echo "<script>alert('Laporan kerusakan aset berhasil dicatat & rincian stok diperbarui!');window.location='kerusakan.php';</script>";
     } else {
         echo "<script>alert('Gagal menyimpan laporan kerusakan!');</script>";
     }
@@ -197,14 +199,23 @@ if (isset($_POST['simpan'])) {
                             <?php if ($is_admin): ?>
                                 <div class="mb-4">
                                     <label class="form-label">Langsung Tugaskan Teknisi (Opsional)</label>
-                                    <input type="text" name="teknisi" class="form-control" placeholder="Ketik nama teknisi di sini...">
-                                    <div class="form-text text-success"><i class="bi bi-check-circle"></i> Fitur khusus Admin: Anda dapat langsung mengisi penanggung jawab perbaikan.</div>
+                                    <select name="teknisi" class="form-select border-primary">
+                                        <option value="">-- Pilih Teknisi (Abaikan jika belum ada) --</option>
+                                        <?php
+                                        // Mengambil nama pengguna yang level/role-nya teknisi
+                                        $query_teknisi = mysqli_query($koneksi, "SELECT nama_pengguna FROM pengguna WHERE level = 'teknisi' AND status = 'aktif'");
+                                        while ($t = mysqli_fetch_assoc($query_teknisi)) {
+                                            echo "<option value='" . htmlspecialchars($t['nama_pengguna']) . "'>" . htmlspecialchars($t['nama_pengguna']) . "</option>";
+                                        }
+                                        ?>
+                                    </select>
+                                    <div class="form-text text-success"><i class="bi bi-check-circle"></i> Fitur khusus Admin: Nama teknisi otomatis diambil dari Data Pengguna.</div>
                                 </div>
                             <?php endif; ?>
 
                             <div class="highlight-danger">
                                 <h6 class="fw-bold text-danger mb-1"><i class="bi bi-shield-fill-exclamation"></i> Peringatan Respon Cepat RS</h6>
-                                <small class="text-secondary d-block">Pelaporan kerusakan pada **Aset Medis (Alkes Vital)** akan langsung merubah status kondisi inventaris utama menjadi tidak operasional demi mencegah malpraktik medis.</small>
+                                <small class="text-secondary d-block">Pelaporan kerusakan pada **Aset Medis (Alkes Vital)** akan langsung menarik ketersediaan stok fisik untuk mencegah peminjaman alat yang tidak operasional.</small>
                             </div>
 
                             <div class="row">

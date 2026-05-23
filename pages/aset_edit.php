@@ -22,13 +22,18 @@ if (isset($_POST['update'])) {
     $jenis = mysqli_real_escape_string($koneksi, $_POST['jenis']);
     $tipe_aset = mysqli_real_escape_string($koneksi, $_POST['tipe_aset']);
     $lokasi = mysqli_real_escape_string($koneksi, $_POST['lokasi']);
-    $kondisi = mysqli_real_escape_string($koneksi, $_POST['kondisi']);
     $asal_usul = mysqli_real_escape_string($koneksi, $_POST['asal_usul']);
     $harga = (int)$_POST['harga'];
     $umur_ekonomis = (int)$_POST['umur_ekonomis'];
     $tanggal_masuk = mysqli_real_escape_string($koneksi, $_POST['tanggal_masuk']);
 
-    // Cek jika ada upload dokumen baru
+    // Tangkap data rincian stok baru
+    $stok_tersedia = (int)$_POST['stok_tersedia'];
+    $stok_rusak = (int)$_POST['stok_rusak'];
+    $stok_perawatan = (int)$_POST['stok_perawatan'];
+    $total_stok = $stok_tersedia + $stok_rusak + $stok_perawatan;
+
+    // Cek upload dokumen
     $dokumen_query = "";
     if (isset($_FILES['dokumen']) && $_FILES['dokumen']['error'] == 0) {
         $file_name = time() . '_' . $_FILES['dokumen']['name'];
@@ -39,7 +44,6 @@ if (isset($_POST['update'])) {
         }
         move_uploaded_file($tmp_name, $folder . $file_name);
 
-        // Hapus file lama jika ada
         if (!empty($data['dokumen']) && file_exists($folder . $data['dokumen'])) {
             unlink($folder . $data['dokumen']);
         }
@@ -49,9 +53,10 @@ if (isset($_POST['update'])) {
     $q_update = "UPDATE aset SET 
                 nama_aset = '$nama_aset', kategori_aset = '$kategori_aset', 
                 jenis = '$jenis', tipe_aset = '$tipe_aset', 
-                lokasi = '$lokasi', kondisi = '$kondisi', 
-                asal_usul = '$asal_usul', harga = '$harga', 
-                umur_ekonomis = '$umur_ekonomis', tanggal_masuk = '$tanggal_masuk'
+                lokasi = '$lokasi', asal_usul = '$asal_usul', harga = '$harga', 
+                umur_ekonomis = '$umur_ekonomis', tanggal_masuk = '$tanggal_masuk',
+                total_stok = '$total_stok', stok_tersedia = '$stok_tersedia',
+                stok_rusak = '$stok_rusak', stok_perawatan = '$stok_perawatan'
                 $dokumen_query
                 WHERE id_aset = $id";
 
@@ -130,6 +135,13 @@ if (isset($_POST['update'])) {
             border-radius: 8px;
             padding: 10px 14px;
         }
+
+        .stok-box {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
     </style>
 </head>
 
@@ -181,14 +193,6 @@ if (isset($_POST['update'])) {
                                 </div>
 
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Kondisi</label>
-                                    <select name="kondisi" class="form-select" required>
-                                        <option value="Baik" <?= ($data['kondisi'] == 'Baik') ? 'selected' : '' ?>>Baik</option>
-                                        <option value="Perlu Perawatan" <?= ($data['kondisi'] == 'Perlu Perawatan') ? 'selected' : '' ?>>Perlu Perawatan</option>
-                                        <option value="Rusak" <?= ($data['kondisi'] == 'Rusak') ? 'selected' : '' ?>>Rusak</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-4 mb-3">
                                     <label class="form-label">Asal Usul Perolehan</label>
                                     <select name="asal_usul" class="form-select" required>
                                         <option value="Pembelian" <?= ($data['asal_usul'] == 'Pembelian') ? 'selected' : '' ?>>Pembelian (Dana RS)</option>
@@ -196,19 +200,41 @@ if (isset($_POST['update'])) {
                                         <option value="Sewa" <?= ($data['asal_usul'] == 'Sewa') ? 'selected' : '' ?>>Sewa / Pinjam Pakai</option>
                                     </select>
                                 </div>
+
+                                <div class="col-12 mb-4">
+                                    <div class="stok-box">
+                                        <p class="mb-2 fw-bold text-dark"><i class="bi bi-box-seam"></i> Ubah Rincian Ketersediaan Barang (Stok)</p>
+                                        <div class="row">
+                                            <div class="col-md-4 mb-2">
+                                                <label class="form-label text-success fw-bold">Tersedia (Bisa Dipinjam)</label>
+                                                <input type="number" name="stok_tersedia" class="form-control border-success" required value="<?= $data['stok_tersedia'] ?? 0 ?>" min="0">
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <label class="form-label text-danger fw-bold">Rusak</label>
+                                                <input type="number" name="stok_rusak" class="form-control border-danger" required value="<?= $data['stok_rusak'] ?? 0 ?>" min="0">
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <label class="form-label text-warning text-dark fw-bold">Sedang Perawatan</label>
+                                                <input type="number" name="stok_perawatan" class="form-control border-warning" required value="<?= $data['stok_perawatan'] ?? 0 ?>" min="0">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="col-md-4 mb-3">
-                                    <label class="form-label">Harga Perolehan (Rp)</label>
+                                    <label class="form-label">Harga (Rp)</label>
                                     <input type="number" name="harga" class="form-control" required value="<?= $data['harga'] ?>">
                                 </div>
                                 <div class="col-md-4 mb-3">
-                                    <label class="form-label">Umur Ekonomis (Tahun)</label>
+                                    <label class="form-label">Umur (Tahun)</label>
                                     <input type="number" name="umur_ekonomis" class="form-control" required value="<?= $data['umur_ekonomis'] ?>">
                                 </div>
-                                <div class="col-md-6 mb-4">
+                                <div class="col-md-4 mb-3">
                                     <label class="form-label">Tanggal Masuk / Pembelian</label>
                                     <input type="date" name="tanggal_masuk" class="form-control" required value="<?= $data['tanggal_masuk'] ?>">
                                 </div>
-                                <div class="col-md-6 mb-4">
+
+                                <div class="col-12 mb-4">
                                     <label class="form-label">Upload Dokumen Baru (Abaikan jika tidak diganti)</label>
                                     <input type="file" name="dokumen" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
                                     <?php if (!empty($data['dokumen'])): ?>

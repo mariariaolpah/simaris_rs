@@ -26,7 +26,9 @@ $query = mysqli_query($koneksi, "
     SELECT 
         kerusakan.*,
         aset.kategori_aset,
-        aset.lokasi 
+        aset.lokasi,
+        aset.stok_tersedia,
+        aset.stok_rusak
     FROM kerusakan 
     LEFT JOIN aset ON kerusakan.nama_aset = aset.nama_aset
     $whereClause
@@ -58,18 +60,24 @@ $pdf->Ln(15);
 /* ================= JUDUL ================= */
 $pdf->SetFont('Arial', 'B', 14);
 $pdf->Cell(0, 10, 'DATA KERUSAKAN SELURUH ASET RS BHAYANGKARA', 0, 1, 'C');
-$pdf->Ln(5);
+$pdf->Ln(2);
+
+// Keterangan Singkatan Stok
+$pdf->SetFont('Arial', 'I', 8);
+$pdf->SetTextColor(80, 80, 80);
+$pdf->Cell(0, 5, '*Keterangan Info Stok: ( T = Tersedia | R = Rusak )', 0, 1, 'L');
+$pdf->Ln(2);
 
 /* ================= HEADER TABEL ================= */
-$pdf->SetFont('Arial', 'B', 9);
+$pdf->SetFont('Arial', 'B', 8);
 $pdf->SetFillColor(72, 201, 176); // Warna Hijau Tosca
 $pdf->SetTextColor(255);
 
-// Penyesuaian Total Widths (Total harus tetap 277mm untuk kertas A4 Landscape)
-$widths = [10, 40, 30, 20, 25, 25, 20, 30, 77];
+// [PERBAIKAN] Lebar kolom diukur presisi agar total pas 277mm untuk kertas A4 Landscape
+$widths = [8, 33, 18, 23, 18, 22, 22, 18, 25, 90];
 
-// Menambahkan Header 'Teknisi'
-$header = ['No', 'Nama Aset', 'Lokasi', 'Kategori', 'Pelapor', 'Teknisi', 'Tanggal', 'Status', 'Rincian Kerusakan'];
+// Menambahkan kolom 'Info Stok' terpisah agar sangat rapi
+$header = ['No', 'Nama Aset', 'Info Stok', 'Lokasi', 'Kategori', 'Pelapor', 'Teknisi', 'Tanggal', 'Status', 'Rincian Kerusakan'];
 
 for ($i = 0; $i < count($header); $i++) {
     $pdf->Cell($widths[$i], 9, $header[$i], 1, 0, 'C', true);
@@ -83,28 +91,43 @@ $pdf->SetTextColor(0);
 $i = 1;
 if (mysqli_num_rows($query) > 0) {
     while ($row = mysqli_fetch_assoc($query)) {
-        // Cek jika data kosong, berikan strip (-)
+
+        // Pengecekan data kosong
         $lokasi   = !empty($row['lokasi']) ? $row['lokasi'] : '-';
         $kategori = !empty($row['kategori_aset']) ? $row['kategori_aset'] : '-';
         $pelapor  = !empty($row['pelapor']) ? $row['pelapor'] : '-';
         $teknisi  = !empty($row['teknisi']) ? $row['teknisi'] : '-';
+        $status   = !empty($row['status']) ? $row['status'] : '-';
 
-        // Membatasi panjang teks agar tidak tumpah dan rapi
-        $nama_aset  = strlen($row['nama_aset']) > 25 ? substr($row['nama_aset'], 0, 23) . '...' : $row['nama_aset'];
-        $keterangan = strlen($row['keterangan']) > 55 ? substr($row['keterangan'], 0, 52) . '...' : $row['keterangan'];
+        // Mengambil data stok (T = Tersedia, R = Rusak)
+        $stok_tersedia = isset($row['stok_tersedia']) ? $row['stok_tersedia'] : '0';
+        $stok_rusak    = isset($row['stok_rusak']) ? $row['stok_rusak'] : '0';
+        $info_stok     = "T: " . $stok_tersedia . " | R: " . $stok_rusak;
 
+        // Membatasi panjang teks agar rapi dan tinggi baris tabel tidak rusak
+        $nama_aset  = strlen($row['nama_aset']) > 20 ? substr($row['nama_aset'], 0, 17) . '...' : $row['nama_aset'];
+        $lokasi     = strlen($lokasi) > 13 ? substr($lokasi, 0, 11) . '...' : $lokasi;
+        $pelapor    = strlen($pelapor) > 13 ? substr($pelapor, 0, 11) . '...' : $pelapor;
+        $teknisi    = strlen($teknisi) > 13 ? substr($teknisi, 0, 11) . '...' : $teknisi;
+        $status     = strlen($status) > 16 ? substr($status, 0, 14) . '...' : $status;
+        $keterangan = strlen($row['keterangan']) > 65 ? substr($row['keterangan'], 0, 62) . '...' : $row['keterangan'];
+
+        // Format tanggal dipendekkan jadi dd/mm/yy (misal: 15/08/26) agar hemat tempat
+        $tanggal    = date('d/m/y', strtotime($row['tanggal']));
+
+        // Cetak Baris
         $pdf->Cell($widths[0], 8, $i++, 1, 0, 'C');
         $pdf->Cell($widths[1], 8, $nama_aset, 1, 0, 'L');
-        $pdf->Cell($widths[2], 8, $lokasi, 1, 0, 'L');
-        $pdf->Cell($widths[3], 8, $kategori, 1, 0, 'C');
-        $pdf->Cell($widths[4], 8, $pelapor, 1, 0, 'L');
-        $pdf->Cell($widths[5], 8, $teknisi, 1, 0, 'L'); // Tambahan sel Teknisi
-        $pdf->Cell($widths[6], 8, date('d-m-Y', strtotime($row['tanggal'])), 1, 0, 'C');
-        $pdf->Cell($widths[7], 8, $row['status'], 1, 0, 'C');
-        $pdf->Cell($widths[8], 8, $keterangan, 1, 1, 'L');
+        $pdf->Cell($widths[2], 8, $info_stok, 1, 0, 'C'); // <--- Kolom Info Stok Khusus
+        $pdf->Cell($widths[3], 8, $lokasi, 1, 0, 'L');
+        $pdf->Cell($widths[4], 8, $kategori, 1, 0, 'C');
+        $pdf->Cell($widths[5], 8, $pelapor, 1, 0, 'L');
+        $pdf->Cell($widths[6], 8, $teknisi, 1, 0, 'L');
+        $pdf->Cell($widths[7], 8, $tanggal, 1, 0, 'C');
+        $pdf->Cell($widths[8], 8, $status, 1, 0, 'C');
+        $pdf->Cell($widths[9], 8, $keterangan, 1, 1, 'L');
     }
 } else {
-    // Jika data kosong
     $pdf->SetFont('Arial', 'I', 9);
     $pdf->Cell(array_sum($widths), 10, 'Tidak ada data kerusakan yang ditemukan.', 1, 1, 'C');
 }
@@ -125,14 +148,7 @@ $pdf->Cell(0, 5, $_SESSION['nama_pengguna'], 0, 1, 'R');
 $pdf->Ln(5);
 
 $pdf->SetFont('Arial', 'I', 8);
-$pdf->Cell(
-    0,
-    5,
-    'Dicetak pada: ' . date('d-m-Y H:i:s') . ' oleh ' . $_SESSION['nama_pengguna'],
-    0,
-    1,
-    'R'
-);
+$pdf->Cell(0, 5, 'Dicetak pada: ' . date('d-m-Y H:i:s') . ' oleh ' . $_SESSION['nama_pengguna'], 0, 1, 'R');
 
 $pdf->Output();
 exit;

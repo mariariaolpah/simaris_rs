@@ -37,9 +37,9 @@ $tahun_filter = isset($_GET['tahun']) ? mysqli_real_escape_string($koneksi, $_GE
 
 $whereConditions = [];
 
-// Filter berdasarkan pencarian
+// Filter berdasarkan pencarian (Modifikasi: Hapus kondisi pencarian untuk kolom 'kondisi' yang akan dihapus)
 if ($search != '') {
-    $whereConditions[] = "(nama_aset LIKE '%$search%' OR jenis LIKE '%$search%' OR lokasi LIKE '%$search%' OR kondisi LIKE '%$search%')";
+    $whereConditions[] = "(nama_aset LIKE '%$search%' OR jenis LIKE '%$search%' OR lokasi LIKE '%$search%')";
 }
 
 // Filter berdasarkan Tab
@@ -88,7 +88,6 @@ while ($row = mysqli_fetch_assoc($query)) {
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 
     <style>
-        /* Gaya huruf dikembalikan ke bawaan standar tanpa Poppins */
         body {
             background-color: #f4f6f9;
             color: #333;
@@ -139,7 +138,6 @@ while ($row = mysqli_fetch_assoc($query)) {
             align-items: center;
         }
 
-        /* Styling Nav Tabs */
         .nav-tabs {
             border-bottom: 2px solid #e2e8f0;
             margin-top: 15px;
@@ -181,7 +179,6 @@ while ($row = mysqli_fetch_assoc($query)) {
             background: #f0fdf4;
         }
 
-        /* Tabel */
         .table-responsive {
             border-radius: 0 0 12px 12px;
             overflow-x: auto;
@@ -213,7 +210,6 @@ while ($row = mysqli_fetch_assoc($query)) {
             background-color: #fafffd !important;
         }
 
-        /* Badge & Tombol */
         .badge-medis {
             background-color: #fee2e2;
             color: #dc2626;
@@ -327,7 +323,8 @@ while ($row = mysqli_fetch_assoc($query)) {
                                         <th>Jenis</th>
                                         <th>Tipe</th>
                                         <th>Lokasi Ruangan</th>
-                                        <th>Kondisi</th>
+                                        <th>Total Stok</th>
+                                        <th>Rincian Ketersediaan</th>
                                         <th>Asal Usul</th>
                                         <th>Harga Perolehan</th>
                                         <th>Umur Eko.</th>
@@ -339,7 +336,7 @@ while ($row = mysqli_fetch_assoc($query)) {
                                 <tbody>
                                     <?php if (empty($aset_list)): ?>
                                         <tr>
-                                            <td colspan="13" class="text-muted py-5 text-center">
+                                            <td colspan="14" class="text-muted py-5 text-center">
                                                 <i class="bi bi-inboxes text-secondary d-block mb-2" style="font-size: 2rem;"></i>
                                                 Data untuk kategori ini belum tersedia atau tidak ditemukan.
                                             </td>
@@ -364,16 +361,25 @@ while ($row = mysqli_fetch_assoc($query)) {
                                                 <td><?= htmlspecialchars($a['tipe_aset']) ?></td>
                                                 <td class="text-start"><i class="bi bi-geo-alt text-danger me-1"></i><?= htmlspecialchars($a['lokasi']) ?></td>
 
-                                                <td>
-                                                    <?php if ($a['kondisi'] == 'Baik'): ?>
-                                                        <span class="text-success fw-bold"><i class="bi bi-check-circle-fill me-1"></i>Baik</span>
-                                                    <?php elseif ($a['kondisi'] == 'Rusak'): ?>
-                                                        <span class="text-danger fw-bold"><i class="bi bi-x-circle-fill me-1"></i>Rusak</span>
-                                                    <?php else: ?>
-                                                        <span class="text-warning fw-bold"><i class="bi bi-exclamation-circle-fill me-1"></i>Perawatan</span>
-                                                    <?php endif; ?>
+                                                <td class="text-center">
+                                                    <div class="fw-bold text-primary" style="font-size: 1.1rem;">
+                                                        <?= isset($a['total_stok']) ? htmlspecialchars($a['total_stok']) : (isset($a['stok']) ? htmlspecialchars($a['stok']) : '0') ?> Unit
+                                                    </div>
                                                 </td>
 
+                                                <td>
+                                                    <div class="d-flex flex-column gap-1 align-items-start">
+                                                        <span class="badge bg-success w-100 text-start" style="font-size: 0.8rem; font-weight: normal;">
+                                                            <i class="bi bi-check-circle-fill me-1"></i> Tersedia: <?= isset($a['stok_tersedia']) ? htmlspecialchars($a['stok_tersedia']) : '0' ?>
+                                                        </span>
+                                                        <span class="badge bg-danger w-100 text-start" style="font-size: 0.8rem; font-weight: normal;">
+                                                            <i class="bi bi-x-circle-fill me-1"></i> Rusak: <?= isset($a['stok_rusak']) ? htmlspecialchars($a['stok_rusak']) : '0' ?>
+                                                        </span>
+                                                        <span class="badge bg-warning text-dark w-100 text-start" style="font-size: 0.8rem; font-weight: normal;">
+                                                            <i class="bi bi-exclamation-circle-fill me-1"></i> Perawatan: <?= isset($a['stok_perawatan']) ? htmlspecialchars($a['stok_perawatan']) : '0' ?>
+                                                        </span>
+                                                    </div>
+                                                </td>
                                                 <td><?= htmlspecialchars($a['asal_usul']) ?></td>
                                                 <td class="text-end fw-bold text-dark">Rp <?= number_format($a['harga'], 0, ',', '.') ?></td>
 

@@ -13,13 +13,20 @@ if (isset($_POST['simpan'])) {
     $jenis = mysqli_real_escape_string($koneksi, $_POST['jenis']);
     $tipe_aset = mysqli_real_escape_string($koneksi, $_POST['tipe_aset']);
     $lokasi = mysqli_real_escape_string($koneksi, $_POST['lokasi']);
-    $kondisi = mysqli_real_escape_string($koneksi, $_POST['kondisi']);
     $asal_usul = mysqli_real_escape_string($koneksi, $_POST['asal_usul']);
     $harga = (int)$_POST['harga'];
     $umur_ekonomis = (int)$_POST['umur_ekonomis'];
     $tanggal_masuk = mysqli_real_escape_string($koneksi, $_POST['tanggal_masuk']);
 
-    // Upload Dokumen (Opsional)
+    // Tangkap data rincian stok
+    $stok_tersedia = (int)$_POST['stok_tersedia'];
+    $stok_rusak = (int)$_POST['stok_rusak'];
+    $stok_perawatan = (int)$_POST['stok_perawatan'];
+
+    // Hitung total stok otomatis
+    $total_stok = $stok_tersedia + $stok_rusak + $stok_perawatan;
+
+    // Upload Dokumen
     $dokumen = "";
     if (isset($_FILES['dokumen']) && $_FILES['dokumen']['error'] == 0) {
         $file_name = time() . '_' . $_FILES['dokumen']['name'];
@@ -32,13 +39,14 @@ if (isset($_POST['simpan'])) {
         $dokumen = $file_name;
     }
 
-    $query = "INSERT INTO aset (nama_aset, kategori_aset, jenis, tipe_aset, lokasi, kondisi, asal_usul, harga, umur_ekonomis, tanggal_masuk, dokumen) 
-              VALUES ('$nama_aset', '$kategori_aset', '$jenis', '$tipe_aset', '$lokasi', '$kondisi', '$asal_usul', '$harga', '$umur_ekonomis', '$tanggal_masuk', '$dokumen')";
+    // Perhatikan: Kolom 'kondisi' tidak kita insert lagi, diganti dengan rincian stok
+    $query = "INSERT INTO aset (nama_aset, kategori_aset, jenis, tipe_aset, lokasi, asal_usul, harga, umur_ekonomis, tanggal_masuk, dokumen, total_stok, stok_tersedia, stok_rusak, stok_perawatan) 
+              VALUES ('$nama_aset', '$kategori_aset', '$jenis', '$tipe_aset', '$lokasi', '$asal_usul', '$harga', '$umur_ekonomis', '$tanggal_masuk', '$dokumen', '$total_stok', '$stok_tersedia', '$stok_rusak', '$stok_perawatan')";
 
     if (mysqli_query($koneksi, $query)) {
         echo "<script>alert('Data aset berhasil ditambahkan!'); window.location='aset.php';</script>";
     } else {
-        echo "<script>alert('Gagal menambahkan data!');</script>";
+        echo "<script>alert('Gagal menambahkan data! Pastikan kolom stok_tersedia dll sudah ada di database.');</script>";
     }
 }
 ?>
@@ -110,6 +118,13 @@ if (isset($_POST['simpan'])) {
             border-radius: 8px;
             padding: 10px 14px;
         }
+
+        .stok-box {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
     </style>
 </head>
 
@@ -161,14 +176,6 @@ if (isset($_POST['simpan'])) {
                                 </div>
 
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Kondisi</label>
-                                    <select name="kondisi" class="form-select" required>
-                                        <option value="Baik">Baik</option>
-                                        <option value="Perlu Perawatan">Perlu Perawatan</option>
-                                        <option value="Rusak">Rusak</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-4 mb-3">
                                     <label class="form-label">Asal Usul Perolehan</label>
                                     <select name="asal_usul" class="form-select" required>
                                         <option value="Pembelian">Pembelian (Dana RS)</option>
@@ -176,19 +183,44 @@ if (isset($_POST['simpan'])) {
                                         <option value="Sewa">Sewa / Pinjam Pakai</option>
                                     </select>
                                 </div>
+
+                                <div class="col-12 mb-4">
+                                    <div class="stok-box">
+                                        <p class="mb-2 fw-bold text-dark"><i class="bi bi-box-seam"></i> Rincian Ketersediaan Barang (Stok)</p>
+                                        <div class="row">
+                                            <div class="col-md-4 mb-2">
+                                                <label class="form-label text-success fw-bold">Tersedia (Bisa Dipinjam)</label>
+                                                <input type="number" name="stok_tersedia" class="form-control border-success" required value="1" min="0">
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <label class="form-label text-danger fw-bold">Rusak</label>
+                                                <input type="number" name="stok_rusak" class="form-control border-danger" required value="0" min="0">
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <label class="form-label text-warning text-dark fw-bold">Sedang Perawatan</label>
+                                                <input type="number" name="stok_perawatan" class="form-control border-warning" required value="0" min="0">
+                                            </div>
+                                            <div class="col-12 mt-1">
+                                                <small class="text-muted">*Sistem akan menjumlahkan angka di atas menjadi Total Keseluruhan Stok.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="col-md-4 mb-3">
-                                    <label class="form-label">Harga Perolehan (Rp)</label>
+                                    <label class="form-label">Harga (Rp)</label>
                                     <input type="number" name="harga" class="form-control" required placeholder="Contoh: 15000000">
                                 </div>
                                 <div class="col-md-4 mb-3">
-                                    <label class="form-label">Umur Ekonomis (Tahun)</label>
+                                    <label class="form-label">Umur (Tahun)</label>
                                     <input type="number" name="umur_ekonomis" class="form-control" required placeholder="Contoh: 5">
                                 </div>
-                                <div class="col-md-6 mb-4">
+                                <div class="col-md-4 mb-3">
                                     <label class="form-label">Tanggal Masuk / Pembelian</label>
                                     <input type="date" name="tanggal_masuk" class="form-control" required>
                                 </div>
-                                <div class="col-md-6 mb-4">
+
+                                <div class="col-12 mb-4">
                                     <label class="form-label">Upload Dokumen (Opsional - PDF/JPG)</label>
                                     <input type="file" name="dokumen" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
                                 </div>
