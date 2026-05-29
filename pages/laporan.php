@@ -61,7 +61,10 @@ function getCount($koneksi, $jenis, $tahun)
             break;
         case 'kalibrasi':
             $table = 'perawatan';
-            $col_date = 'tanggal';
+            // PERBAIKAN: Menyamakan kondisi JOIN dan WHERE dengan file laporan_kalibrasi.php
+            $join = "LEFT JOIN aset ON perawatan.nama_aset = aset.nama_aset COLLATE utf8mb4_general_ci";
+            $where[] = "perawatan.tanggal_kalibrasi_berikutnya IS NOT NULL AND perawatan.tanggal_kalibrasi_berikutnya >= '2000-01-01'";
+            $col_date = 'perawatan.tanggal_kalibrasi_berikutnya';
             break;
         case 'pelacakan_lokasi':
             // PENTING: Menggunakan tabel riwayat_lokasi sesuai dengan file laporan_pelacakan.php
@@ -122,37 +125,46 @@ $laporan_list = [
     ['Laporan Pelacakan Lokasi Aset', getCount($koneksi, 'pelacakan_lokasi', $tahun_filter), $periode_text]
 ];
 
+// =======================
+// REKAPITULASI UNTUK MENJAWAB PERTANYAAN DOSEN
+// (Otomatis menjumlahkan angka dari kolom Jumlah Data di tabel)
+// =======================
+$total_selesai = 0;
+$total_monitoring = 0;
+$total_proses = 0;
+
+foreach ($laporan_list as $l) {
+    if ($l[0] === 'Laporan Perawatan Berjalan') {
+        $total_proses += $l[1];
+    } elseif ($l[0] === 'Laporan Kalibrasi' || $l[0] === 'Laporan Pelacakan Lokasi Aset') {
+        $total_monitoring += $l[1];
+    } else {
+        $total_selesai += $l[1];
+    }
+}
+
 function getReportLink($jenis)
 {
     switch ($jenis) {
-
         case 'Laporan Aset':
             return 'laporan_aset.php';
-
         case 'Laporan Kerusakan':
             return 'laporan_kerusakan.php';
-
         case 'Laporan Perawatan':
             return 'laporan_perawatan.php';
-
         case 'Laporan Perbaikan':
             return 'laporan_perbaikan.php';
-
         case 'Laporan Perawatan Berjalan':
             return 'laporan_perawatan_berjalan.php';
-
         case 'Laporan Peminjaman Aset':
             return 'laporan_peminjaman.php';
-
         case 'Laporan Hasil Audit Fisik':
             return 'laporan_audit.php';
-
         case 'Laporan Rekapitulasi Nilai Aset':
             return 'laporan_nilai.php';
             // LINK BARU
         case 'Laporan Kalibrasi':
             return 'laporan_kalibrasi.php';
-
             // LINK BARU
         case 'Laporan Pelacakan Lokasi Aset':
             return 'laporan_pelacakan.php';
@@ -170,9 +182,7 @@ function getReportLink($jenis)
     <title>Laporan | SIMARIS RS Bhayangkara</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <link rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 
     <style>
         body {
@@ -278,6 +288,13 @@ function getReportLink($jenis)
 
                     <div class="card-body table-responsive">
 
+                        <div class="alert alert-info py-2 px-3 mb-3 d-flex align-items-center flex-wrap gap-3" style="border-radius: 8px;">
+                            <strong><i class="bi bi-info-circle-fill me-1"></i> Rincian Keseluruhan Aset:</strong>
+                            <span><span class="badge bg-primary">Monitoring</span> <?= $total_monitoring ?> Aset</span>
+                            <span><span class="badge bg-warning text-dark">Sedang Proses</span> <?= $total_proses ?> Aset</span>
+                            <span><span class="badge bg-success">Selesai</span> <?= $total_selesai ?> Aset/Data</span>
+                        </div>
+
                         <table class="table table-bordered table-hover align-middle text-center"
                             id="laporanTable">
 
@@ -324,7 +341,6 @@ function getReportLink($jenis)
                                         <td><?= $l[2] ?></td>
 
                                         <td>
-
                                             <span class="badge bg-<?=
                                                                     $status === 'Selesai'
                                                                         ? 'success'
@@ -332,23 +348,16 @@ function getReportLink($jenis)
                                                                             ? 'primary'
                                                                             : 'warning')
                                                                     ?>">
-
                                                 <?= $status ?>
-
                                             </span>
-
                                         </td>
 
                                         <td>
-
                                             <a href="<?= getReportLink($l[0]) ?><?= !empty($tahun_filter) ? '?tahun=' . $tahun_filter : '' ?>"
                                                 target="_blank"
                                                 class="btn btn-sm btn-success" style="border-radius: 6px;">
-
                                                 <i class="bi bi-eye"></i> Lihat
-
                                             </a>
-
                                         </td>
 
                                     </tr>

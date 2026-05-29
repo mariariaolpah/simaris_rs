@@ -65,11 +65,11 @@ if (isset($_SESSION['level']) && $_SESSION['level'] == 'user') {
 $total_aset = mysqli_fetch_array(mysqli_query($koneksi, "SELECT COUNT(*) AS t FROM aset"))['t'];
 
 /// --- TAMBAHAN FITUR SKRIPSI: Hitung total harga aset ---
-// PERBAIKAN: Kalikan harga dengan total_stok agar akurat dengan laporan nilai
 $query_harga = mysqli_query($koneksi, "SELECT SUM(harga * total_stok) AS total_nilai FROM aset");
 $data_harga = mysqli_fetch_assoc($query_harga);
 $total_rupiah = $data_harga['total_nilai'] ? $data_harga['total_nilai'] : 0;
 // -------------------------------------------------------
+
 // Hitung aset berdasarkan kolom kondisi di tabel aset
 $aset_baik = mysqli_fetch_array(mysqli_query($koneksi, "
     SELECT COUNT(*) as t FROM aset 
@@ -102,7 +102,6 @@ $perawatan_selesai = mysqli_fetch_array(mysqli_query($koneksi, "
     WHERE status='Selesai'
 "))['t'];
 
-// --- TAMBAHAN BARU: DATA KATEGORI & KALIBRASI ---
 // Hitung Kategori Aset untuk Grafik
 $q_kategori = mysqli_query($koneksi, "SELECT kategori_aset, COUNT(*) as jumlah FROM aset GROUP BY kategori_aset");
 $jml_medis = 0;
@@ -196,7 +195,6 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
             color: #2c7a7b;
         }
 
-        /* STAT CARD RAPIH */
         .stat-row {
             display: flex;
             flex-wrap: wrap;
@@ -302,6 +300,7 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
                         <?= mysqli_num_rows($q_kalibrasi); ?>
                     </p>
                 </div>
+
                 <div class="row g-3">
                     <div class="col-md-7">
                         <div class="card h-100">
@@ -336,22 +335,25 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
                         </div>
                     </div>
 
+                    <!-- WADAH GRAFIK DIPERBESAR SUPAYA TEKS TIDAK TERPOTONG -->
                     <div class="col-md-5">
                         <div class="card h-100">
                             <div class="card-header">Persentase Kondisi Aset</div>
-                            <div class="card-body d-flex justify-content-center align-items-center">
-                                <canvas id="asetChart" width="200" height="200"></canvas>
+                            <div class="card-body d-flex justify-content-center align-items-center" style="height: 320px;">
+                                <!-- Dihapus width dan height fixed agar chart bisa responsive -->
+                                <canvas id="asetChart" style="width: 100%; height: 100%;"></canvas>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="row g-3 mt-2">
+                    <!-- WADAH GRAFIK KATEGORI -->
                     <div class="col-md-5">
                         <div class="card h-100 border-0 shadow-sm">
                             <div class="card-header">Proporsi Kategori Aset</div>
-                            <div class="card-body d-flex justify-content-center align-items-center">
-                                <canvas id="kategoriChart" width="200" height="200"></canvas>
+                            <div class="card-body d-flex justify-content-center align-items-center" style="height: 320px;">
+                                <canvas id="kategoriChart" style="width: 100%; height: 100%;"></canvas>
                             </div>
                         </div>
                     </div>
@@ -403,7 +405,6 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
                 </div>
 
                 <script>
-                    // Daftarkan Plugin Datalabels
                     Chart.register(ChartDataLabels);
 
                     // Grafik Kondisi Aset
@@ -411,7 +412,7 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
                     new Chart(ctx, {
                         type: 'pie',
                         data: {
-                            labels: ['Baik', 'Perlu Perawatan', 'Rusak'],
+                            labels: ['Baik', 'Perawatan', 'Rusak'],
                             datasets: [{
                                 data: [<?= $aset_baik ?>, <?= $aset_perawatan ?>, <?= $aset_rusak ?>],
                                 backgroundColor: ['#2c7a7b', '#58d8c5', '#e74c3c'],
@@ -420,30 +421,39 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
                             }]
                         },
                         options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            layout: {
+                                padding: 50 // Padding luas supaya teks paling luar tidak kena tepi kotak
+                            },
                             plugins: {
+                                tooltip: {
+                                    enabled: false
+                                },
                                 datalabels: {
-                                    color: '#fff',
+                                    anchor: 'end',
+                                    align: 'end',
+                                    offset: 10,
+                                    color: function(context) {
+                                        return context.dataset.backgroundColor[context.dataIndex];
+                                    },
                                     font: {
                                         weight: 'bold',
-                                        size: 13
+                                        size: 11
                                     },
                                     textAlign: 'center',
                                     formatter: (value, ctx) => {
-                                        let sum = 0;
-                                        let dataArr = ctx.chart.data.datasets[0].data;
-                                        dataArr.map(data => {
-                                            sum += Number(data);
-                                        });
+                                        let label = ctx.chart.data.labels[ctx.dataIndex];
+                                        let sum = ctx.chart._metasets[ctx.datasetIndex].total;
                                         if (value > 0 && sum > 0) {
                                             let percentage = (value * 100 / sum).toFixed(1) + "%";
-                                            // Menampilkan format: Angka dan persentase di baris bawahnya
-                                            return [value, "(" + percentage + ")"];
+                                            return [label, percentage, "(" + value + " unit)"];
                                         }
                                         return null;
                                     }
                                 },
                                 legend: {
-                                    position: 'bottom'
+                                    display: false
                                 }
                             }
                         }
@@ -454,7 +464,7 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
                     new Chart(ctxKat, {
                         type: 'doughnut',
                         data: {
-                            labels: ['Medis (Alkes)', 'Non-Medis', 'Belum Diatur'],
+                            labels: ['Medis', 'Non-Medis', 'Lainnya'],
                             datasets: [{
                                 data: [<?= $jml_medis ?>, <?= $jml_nonmedis ?>, <?= $jml_lainnya ?>],
                                 backgroundColor: ['#e74c3c', '#3498db', '#95a5a6'],
@@ -463,30 +473,39 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
                             }]
                         },
                         options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            layout: {
+                                padding: 50
+                            },
                             plugins: {
+                                tooltip: {
+                                    enabled: false
+                                },
                                 datalabels: {
-                                    color: '#fff',
+                                    anchor: 'end',
+                                    align: 'end',
+                                    offset: 10,
+                                    color: function(context) {
+                                        return context.dataset.backgroundColor[context.dataIndex];
+                                    },
                                     font: {
                                         weight: 'bold',
-                                        size: 13
+                                        size: 11
                                     },
                                     textAlign: 'center',
                                     formatter: (value, ctx) => {
-                                        let sum = 0;
-                                        let dataArr = ctx.chart.data.datasets[0].data;
-                                        dataArr.map(data => {
-                                            sum += Number(data);
-                                        });
+                                        let label = ctx.chart.data.labels[ctx.dataIndex];
+                                        let sum = ctx.chart._metasets[ctx.datasetIndex].total;
                                         if (value > 0 && sum > 0) {
                                             let percentage = (value * 100 / sum).toFixed(1) + "%";
-                                            // Menampilkan format: Angka dan persentase di baris bawahnya
-                                            return [value, "(" + percentage + ")"];
+                                            return [label, percentage, "(" + value + " unit)"];
                                         }
                                         return null;
                                     }
                                 },
                                 legend: {
-                                    position: 'bottom'
+                                    display: false
                                 }
                             }
                         }
@@ -501,36 +520,26 @@ $q_kalibrasi = mysqli_query($koneksi, "SELECT nama_aset, tanggal_kalibrasi_berik
 
     <script>
         window.addEventListener('DOMContentLoaded', (event) => {
-            // Ambil SEMUA baris di dalam tabel
             const semuaBaris = document.querySelectorAll('.table-hover tbody tr');
             let daftarAlat = [];
 
-            // 1. Kumpulkan data alat yang waktunya "Sisa" ATAU sudah "Terlewat"
             semuaBaris.forEach(function(baris) {
                 if (baris.innerText.includes("Sisa") || baris.innerText.includes("Terlewat")) {
-                    // Merapikan spasi agar nama alat, tanggal, dan statusnya nyambung enak dibaca
                     let teksBersih = baris.innerText.replace(/\s+/g, ' ').trim();
                     daftarAlat.push("👉 " + teksBersih);
                 }
             });
 
-            // 2. Jika ada alat terdeteksi (satu atau lebih), jalankan bunyi & tulisan
             if (daftarAlat.length > 0) {
-                // A. Trigger putar suara notifikasi duluan
                 const putarSuara = document.getElementById('notifSound');
                 putarSuara.play().catch(function(e) {
                     console.log("Browser menahan suara jika belum ada klik dari admin.");
                 });
 
-                // B. Tahan kotak tulisan selama 0.5 detik (500ms) agar suara berbunyi barengan
                 setTimeout(function() {
                     let teksPeringatan = "⚠️ PENGINGAT KALIBRASI ALKES:\n\nSistem mendeteksi jadwal berikut:\n\n";
-
-                    // Menggabungkan SEMUA alat yang terdeteksi ke bawah (pakai enter / baris baru)
                     teksPeringatan += daftarAlat.join("\n");
-
                     teksPeringatan += "\n\nMohon segera tindak lanjuti agar operasional rumah sakit tidak terganggu!";
-
                     alert(teksPeringatan);
                 }, 500);
             }

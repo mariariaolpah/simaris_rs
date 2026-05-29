@@ -8,6 +8,16 @@ if (!isset($_SESSION['id_pengguna']) || strtolower($_SESSION['level']) != 'tekni
 
 include(__DIR__ . '/../config/koneksi.php');
 
+// ==============================================================================
+// SISTEM OTOMATIS PENGISI TANGGAL SELESAI (SUDAH DIPERBAIKI DARI ERROR 0000-00-00)
+// ==============================================================================
+// Jika teknisi A (Budi) mengubah status jadi Selesai di form, dashboard otomatis mengisi tanggalnya
+mysqli_query($koneksi, "UPDATE kerusakan SET tanggal_selesai = CURRENT_DATE() WHERE (status = 'Selesai' OR status = 'Selesai Diperbaiki') AND tanggal_selesai IS NULL");
+
+// Jika teknisi B (Ahmad) mengubah status jadi Selesai, dashboard otomatis mengisi 2 tanggalnya
+mysqli_query($koneksi, "UPDATE perawatan SET tanggal_selesai = CURRENT_DATE(), tanggal_selesai_kalibrasi = CURRENT_DATE() WHERE status = 'Selesai' AND tanggal_selesai IS NULL");
+// ==============================================================================
+
 $nama_teknisi = "Ahmad Fauzi"; // Mengunci data master ke Ahmad Fauzi
 
 // Deteksi fleksibel nama akun
@@ -38,7 +48,8 @@ if ($is_budi) {
     $q_selesai_k = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM kerusakan WHERE teknisi LIKE '%budi%' AND status = 'Selesai'");
     $selesai_kerusakan = mysqli_fetch_assoc($q_selesai_k)['total'] ?? 0;
 
-    $q_tabel_k = mysqli_query($koneksi, "SELECT * FROM kerusakan WHERE teknisi LIKE '%budi%' AND status != 'Selesai' ORDER BY id DESC");
+    // Menampilkan semua riwayat
+    $q_tabel_k = mysqli_query($koneksi, "SELECT * FROM kerusakan WHERE teknisi LIKE '%budi%' ORDER BY id DESC");
 }
 
 if ($is_ahmad) {
@@ -69,8 +80,8 @@ if ($is_ahmad) {
         }
     }
 
-    // Menampilkan agenda berjalan yang belum selesai dikerjakan oleh Ahmad
-    $q_tabel_p = mysqli_query($koneksi, "SELECT * FROM perawatan WHERE (teknisi = '$nama_teknisi' OR petugas_kalibrasi = '$nama_teknisi') AND status != 'Selesai' ORDER BY id DESC");
+    // Menampilkan semua riwayat
+    $q_tabel_p = mysqli_query($koneksi, "SELECT * FROM perawatan WHERE (teknisi = '$nama_teknisi' OR petugas_kalibrasi = '$nama_teknisi') ORDER BY id DESC");
 }
 ?>
 
@@ -122,7 +133,6 @@ if ($is_ahmad) {
             padding: 35px 30px;
         }
 
-        /* Modern Metric Cards Style */
         .stat-card {
             border: none;
             border-radius: 16px;
@@ -161,7 +171,6 @@ if ($is_ahmad) {
             margin-bottom: 16px;
         }
 
-        /* Card Themes Variants */
         .theme-total {
             background: linear-gradient(135deg, #3b82f6, #1d4ed8);
             color: white;
@@ -217,7 +226,6 @@ if ($is_ahmad) {
             opacity: 0.9;
         }
 
-        /* Modern Table Card */
         .main-card {
             border: none;
             border-radius: 20px;
@@ -281,6 +289,7 @@ if ($is_ahmad) {
             gap: 6px;
             font-size: 0.85rem;
             transition: all 0.2s;
+            text-decoration: none;
         }
 
         .btn-action-work:hover {
@@ -289,7 +298,6 @@ if ($is_ahmad) {
             box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
         }
 
-        /* Status Badges refinement */
         .custom-badge {
             padding: 6px 12px;
             border-radius: 8px;
@@ -309,7 +317,6 @@ if ($is_ahmad) {
             gap: 8px;
         }
 
-        /* NEW SAFETY ANIMATIONS & STYLES */
         @keyframes alert-pulse {
             0% {
                 transform: scale(1);
@@ -436,7 +443,9 @@ if ($is_ahmad) {
                                     <tr>
                                         <th class="text-start">Nama Aset Utama</th>
                                         <th>Tgl Perawatan</th>
+                                        <th>Tgl Selesai Perawatan</th>
                                         <th>Jadwal Kalibrasi Berikutnya</th>
+                                        <th>Tgl Selesai Kalibrasi</th>
                                         <th>Status Kalibrasi</th>
                                         <th>Status Rawat</th>
                                         <th>Aksi Cepat</th>
@@ -449,7 +458,9 @@ if ($is_ahmad) {
                                             $tgl_p = date('d-m-Y', strtotime($row['tanggal']));
                                             $tgl_k = $row['tanggal_kalibrasi_berikutnya'];
 
-                                            // Pemrosesan visual status kalibrasi
+                                            $tgl_selesai_p = (!empty($row['tanggal_selesai']) && $row['tanggal_selesai'] != '0000-00-00') ? date('d-m-Y', strtotime($row['tanggal_selesai'])) : '-';
+                                            $tgl_selesai_k = (!empty($row['tanggal_selesai_kalibrasi']) && $row['tanggal_selesai_kalibrasi'] != '0000-00-00') ? date('d-m-Y', strtotime($row['tanggal_selesai_kalibrasi'])) : '-';
+
                                             if ($tgl_k && $tgl_k != '0000-00-00') {
                                                 $formatted_k = date('d-m-Y', strtotime($tgl_k));
                                                 $selisih_hari = floor((strtotime($tgl_k) - strtotime('today')) / (60 * 60 * 24));
@@ -467,14 +478,16 @@ if ($is_ahmad) {
                                                 $kalibrasi_status = "<span class='text-muted small'>-</span>";
                                             }
 
-                                            $badge_class = ($row['status'] == 'Belum Dimulai') ? 'bg-secondary' : 'bg-warning text-dark';
+                                            $badge_class = ($row['status'] == 'Selesai' || $row['status'] == 'Selesai Diperbaiki') ? 'bg-success text-white' : (($row['status'] == 'Belum Dimulai') ? 'bg-secondary' : 'bg-warning text-dark');
 
                                             echo "<tr>
                                                 <td class='fw-bold text-start text-dark'>
                                                     <i class='bi bi-box-seam text-secondary me-2'></i>{$row['nama_aset']}
                                                 </td>
                                                 <td><i class='bi bi-calendar3 text-muted me-1'></i>{$tgl_p}</td>
+                                                <td class='text-primary fw-bold'>{$tgl_selesai_p}</td>
                                                 <td class='fw-bold text-primary'>{$formatted_k}</td>
+                                                <td class='text-info fw-bold'>{$tgl_selesai_k}</td>
                                                 <td>{$kalibrasi_status}</td>
                                                 <td><span class='badge custom-badge {$badge_class}'>{$row['status']}</span></td>
                                                 <td>
@@ -485,10 +498,7 @@ if ($is_ahmad) {
                                             </tr>";
                                         }
                                     } else {
-                                        echo "<tr><td colspan='6' class='text-center py-5 text-muted'>
-                                            <i class='bi bi-check-all text-success fs-1 d-block mb-2'></i>
-                                            Seluruh agenda pemeliharaan rutin dan kalibrasi alat medis sudah selesai diproses.
-                                        </td></tr>";
+                                        echo "<tr><td colspan='8' class='text-center py-5 text-muted'>Tidak ada agenda pemeliharaan.</td></tr>";
                                     }
                                     ?>
                                 </tbody>
@@ -535,6 +545,7 @@ if ($is_ahmad) {
                                     <tr>
                                         <th class="text-start">Nama Aset</th>
                                         <th>Tanggal Lapor</th>
+                                        <th>Tanggal Selesai Diperbaiki</th>
                                         <th>Status Kerja</th>
                                         <th>Aksi Cepat</th>
                                     </tr>
@@ -544,10 +555,14 @@ if ($is_ahmad) {
                                     if (mysqli_num_rows($q_tabel_k) > 0) {
                                         while ($row = mysqli_fetch_assoc($q_tabel_k)) {
                                             $tgl = date('d-m-Y', strtotime($row['tanggal']));
-                                            $badge_class = 'bg-warning text-dark';
+
+                                            $tgl_selesai_k = (!empty($row['tanggal_selesai']) && $row['tanggal_selesai'] != '0000-00-00') ? date('d-m-Y', strtotime($row['tanggal_selesai'])) : '-';
+
+                                            $badge_class = ($row['status'] == 'Selesai' || $row['status'] == 'Selesai Diperbaiki') ? 'bg-success text-white' : 'bg-warning text-dark';
                                             echo "<tr>
                                                 <td class='fw-bold text-start text-dark'>{$row['nama_aset']}</td>
                                                 <td>{$tgl}</td>
+                                                <td class='text-success fw-bold'>{$tgl_selesai_k}</td>
                                                 <td><span class='badge custom-badge {$badge_class}'>{$row['status']}</span></td>
                                                 <td>
                                                     <a href='kerusakan_edit.php?id={$row['id']}' class='btn-action-work'>
@@ -557,7 +572,7 @@ if ($is_ahmad) {
                                             </tr>";
                                         }
                                     } else {
-                                        echo "<tr><td colspan='4' class='text-center py-5 text-muted'>Tidak ada antrean laporan kerusakan alat medis saat ini.</td></tr>";
+                                        echo "<tr><td colspan='5' class='text-center py-5 text-muted'>Tidak ada antrean laporan kerusakan alat medis.</td></tr>";
                                     }
                                     ?>
                                 </tbody>
