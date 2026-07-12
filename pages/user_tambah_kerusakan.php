@@ -27,6 +27,23 @@ if (isset($_POST['simpan'])) {
     $pelapor    = mysqli_real_escape_string($koneksi, $_SESSION['nama_pengguna']);
     $sumber     = 'App User';
 
+    // ================= LOGIKA UPLOAD FOTO BUKTI ================= //
+    $foto_bukti = ""; // Default kosong jika user tidak upload foto
+    if (isset($_FILES['foto_bukti']) && $_FILES['foto_bukti']['error'] === 0) {
+        $nama_file = $_FILES['foto_bukti']['name'];
+        $tmp_name  = $_FILES['foto_bukti']['tmp_name'];
+
+        // Beri nama unik agar file tidak tertimpa
+        $foto_bukti = time() . '_' . preg_replace("/[^a-zA-Z0-9.]/", "_", $nama_file);
+
+        // Folder tujuan (Pastikan folder ini sudah kamu buat!)
+        $lokasi_simpan = "../assets/img/kerusakan/" . $foto_bukti;
+
+        // Pindahkan file ke folder tujuan
+        move_uploaded_file($tmp_name, $lokasi_simpan);
+    }
+    // ============================================================ //
+
     // ================= LOGIKA SMART ROUTING (PEMISAHAN TUGAS OTOMATIS) ================= //
 
     if ($status == 'Perlu Perawatan') {
@@ -36,7 +53,7 @@ if (isset($_POST['simpan'])) {
 
         // Insert ke tabel perawatan (Ahmad Fauzi akan melihat ini di dashboardnya)
         $query = mysqli_query($koneksi, "
-            INSERT INTO perawatan (nama_aset, teknisi, petugas_kalibrasi, tanggal, status) 
+            INSERT INTO perawatan (nama_aset, teknisi, petugas_kalibrasi, tanggal, status_progres) 
             VALUES ('$nama_aset', '$teknisi_p', '$teknisi_p', '$tanggal', '$status_awal')
         ");
 
@@ -51,10 +68,10 @@ if (isset($_POST['simpan'])) {
         // ---- 2. JALUR PERBAIKAN KERUSAKAN (Masuk ke tabel kerusakan untuk BUDI SETIAWAN) ----
         $teknisi_k = 'Budi Setiawan';
 
-        // Insert ke tabel kerusakan (Budi Setiawan akan melihat ini di dashboardnya)
+        // Insert ke tabel kerusakan beserta foto bukti (Budi Setiawan akan melihat ini di dashboardnya)
         $query = mysqli_query($koneksi, "
-            INSERT INTO kerusakan (nama_aset, tanggal, status, keterangan, pelapor, sumber, teknisi) 
-            VALUES ('$nama_aset', '$tanggal', '$status', '$keterangan', '$pelapor', '$sumber', '$teknisi_k')
+            INSERT INTO kerusakan (nama_aset, tanggal, status, keterangan, pelapor, sumber, teknisi, foto_bukti) 
+            VALUES ('$nama_aset', '$tanggal', '$status', '$keterangan', '$pelapor', '$sumber', '$teknisi_k', '$foto_bukti')
         ");
 
         if ($query) {
@@ -139,7 +156,7 @@ if (isset($_POST['simpan'])) {
                 </div>
 
                 <div class="card-body">
-                    <form method="POST">
+                    <form method="POST" enctype="multipart/form-data">
 
                         <div class="mb-3">
                             <label class="form-label fw-bold">Nama Pelapor</label>
@@ -174,6 +191,12 @@ if (isset($_POST['simpan'])) {
                         <div class="mb-3">
                             <label class="form-label fw-bold">Keterangan / Rincian Kendala</label>
                             <textarea name="keterangan" class="form-control" rows="4" placeholder="Jelaskan detail kerusakan alat secara singkat..." required></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Unggah Foto Bukti (Opsional)</label>
+                            <input type="file" name="foto_bukti" class="form-control" accept="image/jpeg, image/png, image/jpg">
+                            <div class="form-text text-muted"><i class="bi bi-image"></i> Format yang diizinkan: JPG, JPEG, PNG.</div>
                         </div>
 
                         <div class="d-flex justify-content-end gap-2 mt-4">
